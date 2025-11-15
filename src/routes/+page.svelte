@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { FFFSType, FFmpeg } from '@ffmpeg/ffmpeg';
+	import { FFmpeg } from '@ffmpeg/ffmpeg';
+	import { FFFSType } from '@ffmpeg/ffmpeg/dist/esm/types';
 	// @ts-ignore
 	import type { LogEvent, ProgressEvent } from '@ffmpeg/ffmpeg/dist/esm/types';
 	import { fetchFile, toBlobURL } from '@ffmpeg/util';
@@ -15,11 +16,17 @@
 	import Loader from '@lucide/svelte/icons/loader-circle';
 	import * as m from '$lib/paraglide/messages.js';
 	import LanguageSelector from '$lib/components/language-selector.svelte';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
 
 	interface CompressionTarget {
 		label: string;
 		value: number;
 		description: string;
+	}
+
+	interface AudioCompressionTarget {
+		label: string;
+		value: number;
 	}
 
 	interface VideoMetadata {
@@ -30,6 +37,13 @@
 		size: number;
 		fps: number;
 		hasMotion: boolean;
+	}
+
+	interface AudioMetadata {
+		duration: number;
+		bitrate: number;
+		codec: string;
+		size: number;
 	}
 
 	interface CompressionSettings {
@@ -59,6 +73,12 @@
 	let startTime = $state<number>(0);
 	let estimatedTimeRemaining = $state<number>(0);
 
+	let selectedAudioFile = $state<File | null>(null);
+	let processedAudio = $state<Uint8Array | null>(null);
+	let originalAudioSize = $state(0);
+	let compressedAudioSize = $state(0);
+	let audioMetadata = $state<AudioMetadata | null>(null);
+
 	const compressionTargets: CompressionTarget[] = [
 		{ label: '8 MB', value: 8 * 1024 * 1024, description: 'Ultra compression' },
 		{ label: '25 MB', value: 25 * 1024 * 1024, description: 'High compression' },
@@ -66,8 +86,20 @@
 		{ label: '100 MB', value: 100 * 1024 * 1024, description: 'Low compression' }
 	];
 
+	const audioCompressionTargets: AudioCompressionTarget[] = [
+		{ label: '64 kbps', value: 64 },
+		{ label: '96 kbps', value: 96 },
+		{ label: '128 kbps', value: 128 },
+		{ label: '192 kbps', value: 192 },
+		{ label: '256 kbps', value: 256 },
+		{ label: '320 kbps', value: 320 }
+	];
+
 	let selectedTargetValue = $state('25 MB');
 	let selectedTarget = $state(compressionTargets[1]);
+
+	let selectedAudioTargetValue = $state('128 kbps');
+	let selectedAudioTarget = $state(audioCompressionTargets[2]);
 
 	onMount(async (): Promise<void> => {
 		await loadFFmpeg();
@@ -111,6 +143,67 @@
 			console.error('Failed to load FFmpeg:', error);
 			errorMessage = 'Failed to load FFmpeg. Please refresh the page.';
 			message = 'Failed to load FFmpeg';
+		}
+	};
+
+	const compressAudio = async (): Promise<void> => {
+		if (!selectedAudioFile || !isLoaded || !ffmpeg) return;
+
+		isProcessing = true;
+		progress = 0;
+		errorMessage = '';
+		startTime = Date.now();
+		estimatedTimeRemaining = 0;
+
+		try {
+			const inputDir = '/input';
+			await ffmpeg.createDir(inputDir);
+
+			message = 'Mounting input file...';
+			await ffmpeg.mount(FFFSType.WORKERFS, { files: [selectedAudioFile] }, inputDir);
+
+			message = 'Starting compression...';
+
+			const args = [
+				'-i',
+				`${inputDir}/${selectedAudioFile.name}`,
+				'-c:a',
+				'libmp3lame',
+				'-b:a',
+				`${selectedAudioTarget.value}k`,
+				'-ac',
+				'2',
+				'-ar',
+				'44100',
+				'-f',
+				'mp3',
+				'-y',
+				'output.mp3'
+			];
+
+			console.log('FFmpeg args:', args);
+
+			await ffmpeg.exec(args);
+
+			message = 'Reading compressed audio...';
+			const data = (await ffmpeg.readFile('output.mp3')) as Uint8Array;
+			processedAudio = data;
+			compressedAudioSize = data.length;
+
+			await ffmpeg.unmount(inputDir);
+			await ffmpeg.deleteDir(inputDir);
+			await ffmpeg.deleteFile('output.mp3');
+
+			message = 'Compression completed successfully!';
+		} catch (error) {
+			console.error('Compression failed:', error);
+			errorMessage = 'Audio compression failed. Please try again with different settings.';
+			message = 'Compression failed';
+		} finally {
+			isProcessing = false;
+			progress = 0;
+			startTime = 0;
+			estimatedTimeRemaining = 0;
 		}
 	};
 
@@ -404,6 +497,92 @@
 			selectedTarget = target;
 		}
 	};
+
+	const handleAudioFileSelect = (event: Event): void => {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+
+		if (file && file.type.startsWith('audio/')) {
+			const maxSize = 5 * 1024 * 1024 * 1024;
+			if (file.size > maxSize) {
+				errorMessage = m.file_size_limit_error();
+				target.value = '';
+				return;
+			}
+
+			selectedAudioFile = file;
+			originalAudioSize = file.size;
+			errorMessage = '';
+			processedAudio = null;
+			getAudioMetadata(file);
+		} else {
+			errorMessage = 'Please select a valid audio file.';
+		}
+	};
+
+	const getAudioMetadata = async (file: File): Promise<void> => {
+		try {
+			const audio = document.createElement('audio');
+			audio.src = URL.createObjectURL(file);
+
+			await new Promise<void>((resolve) => {
+				audio.onloadedmetadata = () => {
+					let detectedCodec = 'unknown';
+					const fileName = file.name.toLowerCase();
+					if (fileName.endsWith('.mp3')) detectedCodec = 'mp3';
+					else if (fileName.endsWith('.wav')) detectedCodec = 'wav';
+					else if (fileName.endsWith('.aac')) detectedCodec = 'aac';
+					else if (fileName.endsWith('.flac')) detectedCodec = 'flac';
+					else if (fileName.endsWith('.ogg')) detectedCodec = 'ogg';
+					else if (fileName.endsWith('.m4a')) detectedCodec = 'm4a';
+
+					const estimatedBitrate = Math.round((file.size * 8) / audio.duration / 1000);
+
+					audioMetadata = {
+						duration: audio.duration,
+						bitrate: estimatedBitrate,
+						codec: detectedCodec,
+						size: file.size
+					};
+					URL.revokeObjectURL(audio.src);
+					resolve();
+				};
+			});
+		} catch (error) {
+			console.error('Failed to get audio metadata:', error);
+		}
+	};
+
+	const downloadAudio = (): void => {
+		if (!processedAudio) return;
+
+		const blob = new Blob([new Uint8Array(processedAudio as Uint8Array)], { type: 'audio/mpeg' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `compressed_${selectedAudioTarget.label.replace(' ', '')}_${
+			selectedAudioFile?.name || 'audio.mp3'
+		}`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	};
+
+	const audioCompressionRatio = $derived(
+		compressedAudioSize > 0 && originalAudioSize > 0
+			? (1 - compressedAudioSize / originalAudioSize) * 100
+			: 0
+	);
+
+	const handleAudioTargetChange = (value: string | undefined): void => {
+		if (!value) return;
+		selectedAudioTargetValue = value;
+		const target = audioCompressionTargets.find((t) => t.label === value);
+		if (target) {
+			selectedAudioTarget = target;
+		}
+	};
 </script>
 
 <svelte:head>
@@ -447,134 +626,264 @@
 		</Alert.Root>
 	{/if}
 
-	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>{m.upload_video()}</Card.Title>
-				<Card.Description>{m.upload_description()}</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				<div>
-					<Label for="video-upload">{m.choose_video_file()}</Label>
-					<Input
-						id="video-upload"
-						type="file"
-						accept="video/*"
-						onchange={handleFileSelect}
-						disabled={!isLoaded}
-						class="mt-2"
-					/>
-				</div>
+	<Tabs value="video" class="w-full">
+		<TabsList class="grid w-full grid-cols-2">
+			<TabsTrigger value="video">Video</TabsTrigger>
+			<TabsTrigger value="audio" data-testid="audio-tab">Audio</TabsTrigger>
+		</TabsList>
+		<TabsContent value="video">
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>{m.upload_video()}</Card.Title>
+						<Card.Description>{m.upload_description()}</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-4">
+						<div>
+							<Label for="video-upload">{m.choose_video_file()}</Label>
+							<Input
+								id="video-upload"
+								type="file"
+								accept="video/*"
+								onchange={handleFileSelect}
+								disabled={!isLoaded}
+								class="mt-2"
+							/>
+						</div>
 
-				{#if videoMetadata}
-					<div class="space-y-2">
-						<h4 class="font-medium">{m.video_information()}</h4>
-						<div class="grid grid-cols-2 gap-2 text-sm">
-							<div>{m.duration()}: {formatDuration(videoMetadata.duration)}</div>
-							<div>{m.resolution()}: {videoMetadata.resolution}</div>
-							<div>{m.size()}: {formatFileSize(videoMetadata.size)}</div>
-							<div>
-								{m.motion_level()}:
-								<Badge variant={videoMetadata.hasMotion ? 'destructive' : 'secondary'}>
-									{videoMetadata.hasMotion ? m.high_motion() : m.low_motion()}
-								</Badge>
+						{#if videoMetadata}
+							<div class="space-y-2">
+								<h4 class="font-medium">{m.video_information()}</h4>
+								<div class="grid grid-cols-2 gap-2 text-sm">
+									<div>{m.duration()}: {formatDuration(videoMetadata.duration)}</div>
+									<div>{m.resolution()}: {videoMetadata.resolution}</div>
+									<div>{m.size()}: {formatFileSize(videoMetadata.size)}</div>
+									<div>
+										{m.motion_level()}:
+										<Badge variant={videoMetadata.hasMotion ? 'destructive' : 'secondary'}>
+											{videoMetadata.hasMotion ? m.high_motion() : m.low_motion()}
+										</Badge>
+									</div>
+								</div>
 							</div>
-						</div>
-					</div>
-				{/if}
-
-				<div>
-					<Label>{m.target_size()}</Label>
-					<Select.Root type="single" value={selectedTargetValue} onValueChange={handleTargetChange}>
-						<Select.Trigger class="mt-2 w-full">
-							{selectedTargetValue || m.select_target_size()}
-						</Select.Trigger>
-						<Select.Content>
-							{#each compressionTargets as target}
-								<Select.Item value={target.label}>{target.label}</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
-				</div>
-
-				<Button
-					onclick={compressVideo}
-					disabled={!selectedFile || !isLoaded || isProcessing}
-					class="w-full"
-				>
-					{isProcessing ? m.compressing() : m.compress_video()}
-				</Button>
-
-				{#if isProcessing && progress > 0}
-					<div class="space-y-2">
-						<div class="flex justify-between text-sm">
-							<span>{m.progress()}</span>
-							<div class="flex items-center gap-2">
-								<span>{progress}%</span>
-								{#if estimatedTimeRemaining > 0}
-									<span class="text-muted-foreground">• ~{formatTimeRemaining(estimatedTimeRemaining)}</span>
-								{/if}
-							</div>
-						</div>
-						<Progress value={progress} class="w-full" />
-						<p class="text-center text-xs text-muted-foreground">{message}</p>
-					</div>
-				{/if}
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>{m.results()}</Card.Title>
-				<Card.Description>{m.results_description()}</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				{#if processedVideo}
-					<div class="space-y-3">
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.original_size()}:</span>
-							<Badge variant="secondary">{formatFileSize(originalSize)}</Badge>
-						</div>
-
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.compressed_size()}:</span>
-							<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
-								{formatFileSize(compressedSize)}
-							</Badge>
-						</div>
-
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.size_reduction()}:</span>
-							<Badge variant="outline">{compressionRatio.toFixed(1)}%</Badge>
-						</div>
-
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.target_met()}:</span>
-							<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
-								{compressedSize <= selectedTarget.value ? m.yes() : m.no()}
-							</Badge>
-						</div>
-
-						{#if compressedSize > selectedTarget.value}
-							<Alert.Root>
-								<Alert.Description>
-									{m.target_size_warning()}
-								</Alert.Description>
-							</Alert.Root>
 						{/if}
 
-						<Button onclick={downloadVideo} class="w-full">
-							{m.download_compressed()}
+						<div>
+							<Label>{m.target_size()}</Label>
+							<Select.Root
+								type="single"
+								value={selectedTargetValue}
+								onValueChange={handleTargetChange}
+							>
+								<Select.Trigger class="mt-2 w-full">
+									{selectedTargetValue || m.select_target_size()}
+								</Select.Trigger>
+								<Select.Content>
+									{#each compressionTargets as target}
+										<Select.Item value={target.label}>{target.label}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+
+						<Button
+							onclick={compressVideo}
+							disabled={!selectedFile || !isLoaded || isProcessing}
+							class="w-full"
+						>
+							{isProcessing ? m.compressing() : m.compress_video()}
 						</Button>
-					</div>
-				{:else}
-					<div class="py-8 text-center text-muted-foreground">
-						{m.upload_compress_message()}
-					</div>
-				{/if}
-			</Card.Content>
-		</Card.Root>
-	</div>
+
+						{#if isProcessing && progress > 0}
+							<div class="space-y-2">
+								<div class="flex justify-between text-sm">
+									<span>{m.progress()}</span>
+									<div class="flex items-center gap-2">
+										<span>{progress}%</span>
+										{#if estimatedTimeRemaining > 0}
+											<span class="text-muted-foreground"
+												>• ~{formatTimeRemaining(estimatedTimeRemaining)}</span
+											>
+										{/if}
+									</div>
+								</div>
+								<Progress value={progress} class="w-full" />
+								<p class="text-center text-xs text-muted-foreground">{message}</p>
+							</div>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>{m.results()}</Card.Title>
+						<Card.Description>{m.results_description()}</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-4">
+						{#if processedVideo}
+							<div class="space-y-3">
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.original_size()}:</span>
+									<Badge variant="secondary">{formatFileSize(originalSize)}</Badge>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.compressed_size()}:</span>
+									<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
+										{formatFileSize(compressedSize)}
+									</Badge>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.size_reduction()}:</span>
+									<Badge variant="outline">{compressionRatio.toFixed(1)}%</Badge>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.target_met()}:</span>
+									<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
+										{compressedSize <= selectedTarget.value ? m.yes() : m.no()}
+									</Badge>
+								</div>
+
+								{#if compressedSize > selectedTarget.value}
+									<Alert.Root>
+										<Alert.Description>
+											{m.target_size_warning()}
+										</Alert.Description>
+									</Alert.Root>
+								{/if}
+
+								<Button onclick={downloadVideo} class="w-full">
+									{m.download_compressed()}
+								</Button>
+							</div>
+						{:else}
+							<div class="py-8 text-center text-muted-foreground">
+								{m.upload_compress_message()}
+							</div>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			</div>
+		</TabsContent>
+		<TabsContent value="audio">
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>{m.upload_audio()}</Card.Title>
+						<Card.Description>{m.upload_audio_description()}</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-4">
+						<div>
+							<Label for="audio-upload">{m.choose_audio_file()}</Label>
+							<Input
+								id="audio-upload"
+								type="file"
+								accept="audio/mpeg, audio/wav, audio/aac, audio/flac, audio/ogg, audio/x-m4a, audio/opus, audio/x-ms-wma, audio/aiff"
+								onchange={handleAudioFileSelect}
+								disabled={!isLoaded}
+								class="mt-2"
+							/>
+						</div>
+
+						{#if audioMetadata}
+							<div class="space-y-2">
+								<h4 class="font-medium">{m.audio_information()}</h4>
+								<div class="grid grid-cols-2 gap-2 text-sm">
+									<div>{m.duration()}: {formatDuration(audioMetadata.duration)}</div>
+									<div>{m.codec()}: {audioMetadata.codec}</div>
+									<div>{m.size()}: {formatFileSize(audioMetadata.size)}</div>
+									<div>{m.bitrate()}: {audioMetadata.bitrate} kbps</div>
+								</div>
+							</div>
+						{/if}
+
+						<div>
+							<Label>{m.target_bitrate()}</Label>
+							<Select.Root
+								type="single"
+								value={selectedAudioTargetValue}
+								onValueChange={handleAudioTargetChange}
+							>
+								<Select.Trigger class="mt-2 w-full">
+									{selectedAudioTargetValue || m.select_target_bitrate()}
+								</Select.Trigger>
+								<Select.Content>
+									{#each audioCompressionTargets as target}
+										<Select.Item value={target.label}>{target.label}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+
+						<Button
+							onclick={compressAudio}
+							disabled={!selectedAudioFile || !isLoaded || isProcessing}
+							class="w-full"
+						>
+							{isProcessing ? m.compressing() : m.compress_audio()}
+						</Button>
+
+						{#if isProcessing && progress > 0}
+							<div class="space-y-2">
+								<div class="flex justify-between text-sm">
+									<span>{m.progress()}</span>
+									<div class="flex items-center gap-2">
+										<span>{progress}%</span>
+										{#if estimatedTimeRemaining > 0}
+											<span class="text-muted-foreground"
+												>• ~{formatTimeRemaining(estimatedTimeRemaining)}</span
+											>
+										{/if}
+									</div>
+								</div>
+								<Progress value={progress} class="w-full" />
+								<p class="text-center text-xs text-muted-foreground">{message}</p>
+							</div>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>{m.results()}</Card.Title>
+						<Card.Description>{m.results_description()}</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-4">
+						{#if processedAudio}
+							<div class="space-y-3">
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.original_size()}:</span>
+									<Badge variant="secondary">{formatFileSize(originalAudioSize)}</Badge>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.compressed_size()}:</span>
+									<Badge variant="default">
+										{formatFileSize(compressedAudioSize)}
+									</Badge>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{m.size_reduction()}:</span>
+									<Badge variant="outline">{audioCompressionRatio.toFixed(1)}%</Badge>
+								</div>
+
+								<Button onclick={downloadAudio} class="w-full">
+									{m.download_compressed_audio()}
+								</Button>
+							</div>
+						{:else}
+							<div class="py-8 text-center text-muted-foreground">
+								{m.upload_compress_audio_message()}
+							</div>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			</div>
+		</TabsContent>
+	</Tabs>
 
 	<Card.Root class="mt-6">
 		<Card.Header>

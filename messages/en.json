@@ -37,5 +37,17 @@
 	"file_size_limit_error": "File size exceeds the 5GB browser limit. Please select a smaller file.",
 	"select_valid_video": "Please select a valid video file.",
 	"footer_text": "Apache 2.0 Licensed | Built by <a class='text-primary underline' href='https://github.com/anhostfr'>Anhost</a> | Powered by FFmpeg.wasm | Source on <a class='text-primary underline' href='https://github.com/anhostfr/compress.lol'>GitHub</a>",
-	"footer_subtext": "Note: Compression happens entirely in your browser. No files are uploaded to any server."
+	"footer_subtext": "Note: Compression happens entirely in your browser. No files are uploaded to any server.",
+	"upload_audio": "Upload Audio",
+	"upload_audio_description": "Select an audio file to compress.",
+	"choose_audio_file": "Choose Audio File",
+	"audio_information": "Audio Information",
+	"codec": "Codec",
+	"bitrate": "Bitrate",
+	"target_bitrate": "Target Bitrate",
+	"select_target_bitrate": "Select target bitrate",
+	"compress_audio": "Compress Audio",
+	"download_compressed_audio": "Download Compressed Audio",
+	"upload_compress_audio_message": "Upload and compress an audio file to see results here",
+	"select_valid_audio": "Please select a valid audio file."
 }
