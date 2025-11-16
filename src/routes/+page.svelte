@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FFFSType, FFmpeg } from '@ffmpeg/ffmpeg';
+	import { FFmpeg } from '@ffmpeg/ffmpeg';
 	// @ts-ignore
 	import type { LogEvent, ProgressEvent } from '@ffmpeg/ffmpeg/dist/esm/types';
 	import { fetchFile, toBlobURL } from '@ffmpeg/util';

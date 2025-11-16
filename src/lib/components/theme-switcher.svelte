@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Sun, Moon } from 'lucide-svelte';
 	import { theme } from '$lib/store/theme';
-	import { setContext } from 'svelte';
 
 	function toggleTheme() {
 		theme.update((value) => (value === 'light' ? 'dark' : 'light'));
