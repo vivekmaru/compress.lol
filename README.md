@@ -11,6 +11,15 @@
 
 ---
 
+## 📚 Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** - AI Developer Guide for working with Claude
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Comprehensive deployment guide for all platforms
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guidelines for contributing to the project
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture and design decisions
+
+---
+
 ## ✨ Features
 
 - 🎯 **Target-size compression** with intelligent quality adjustment
@@ -59,6 +68,21 @@ npm run dev
 
 ---
 
+## 🏗️ Architecture
+
+compress.lol uses a modern tech stack optimized for performance and developer experience:
+
+- **Frontend**: SvelteKit 2 + Svelte 5 with runes
+- **Styling**: Tailwind CSS 4 + Shadcn/ui components
+- **Media Processing**: FFmpeg.wasm (WebAssembly)
+- **i18n**: Paraglide JS for type-safe translations
+- **Build Tool**: Vite 7
+- **Deployment**: Vercel, Docker, or Node.js
+
+For detailed architecture information, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
 ## 🛠️ Development
 
 ```bash
@@ -101,16 +125,33 @@ Requires WebAssembly and SharedArrayBuffer support.
 
 ---
 
+## 🚀 Deployment
+
+compress.lol can be deployed to various platforms. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions:
+
+- **Vercel** (Recommended) - One-click deployment with automatic CORS headers
+- **Docker** - Self-hosted with multi-stage builds
+- **Node.js** - Deploy to any Node.js hosting platform
+- **Static** - Cloudflare Pages, Netlify, etc.
+
+**Important**: All deployment platforms must support custom CORS headers for FFmpeg.wasm to work.
+
+---
+
 ## 🤝 Contributing
 
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+Quick start:
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Run tests: `npm run check`
-5. Format code: `npm run format`
-6. Commit changes: `git commit -m 'Add amazing feature'`
-7. Push to branch: `git push origin feature/amazing-feature`
-8. Open a Pull Request
+4. Run checks: `npm run check && npm run format`
+5. Commit using [Conventional Commits](https://www.conventionalcommits.org/)
+6. Push to your fork: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for coding standards, commit guidelines, and more.
 
 ---
 
