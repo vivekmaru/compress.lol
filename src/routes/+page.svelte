@@ -18,6 +18,8 @@
 	import ThemeSelector from '$lib/components/ui/selector/theme-selector.svelte';
 	import Settings from '@lucide/svelte/icons/settings';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import AudioCompressor from '$lib/components/audio-compressor.svelte';
 
 	interface CompressionTarget {
 		label: string;
@@ -66,6 +68,7 @@
 	let muteSound = $state(false);
 	let audioOnlyMode = $state(false);
 	let preserveOriginalFps = $state(false);
+	let activeTab = $state('video');
 
 	const getOptimalThreadCount = (): number => {
 		try {
@@ -619,7 +622,16 @@
 		</Alert.Root>
 	{/if}
 
-	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+	<Tabs.Root bind:value={activeTab} class="mb-6">
+		<div class="flex justify-center">
+			<Tabs.List>
+				<Tabs.Trigger value="video">{m.tab_video()}</Tabs.Trigger>
+				<Tabs.Trigger value="audio">{m.tab_audio()}</Tabs.Trigger>
+			</Tabs.List>
+		</div>
+
+		<Tabs.Content value="video">
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>{m.upload_video()}</Card.Title>
@@ -847,7 +859,20 @@
 				{/if}
 			</Card.Content>
 		</Card.Root>
-	</div>
+			</div>
+		</Tabs.Content>
+
+		<Tabs.Content value="audio">
+			<AudioCompressor
+				{ffmpeg}
+				{isLoaded}
+				bind:progress
+				bind:message
+				bind:estimatedTimeRemaining
+				{isChromium}
+			/>
+		</Tabs.Content>
+	</Tabs.Root>
 
 	<Card.Root class="mt-6">
 		<Card.Header>
