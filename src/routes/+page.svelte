@@ -15,6 +15,7 @@
 	import Loader from '@lucide/svelte/icons/loader-circle';
 	import * as m from '$lib/paraglide/messages.js';
 	import LanguageSelector from '$lib/components/language-selector.svelte';
+	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 
 	interface CompressionTarget {
 		label: string;
@@ -426,8 +427,9 @@
 </svelte:head>
 
 <div class="container mx-auto max-w-4xl p-6">
-	<div class="mb-2 flex items-center justify-center">
+	<div class="mb-2 flex items-center justify-center gap-2">
 		<h1 class="mr-4 mb-2 text-4xl font-bold">{m.app_title()}</h1>
+		<ThemeToggle />
 		<LanguageSelector />
 	</div>
 	<div class="mb-8 text-center">
