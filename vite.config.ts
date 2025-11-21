@@ -29,5 +29,8 @@ export default defineConfig({
 		fs: {
 			allow: ['../..']
 		}
+	},
+	ssr: {
+		noExternal: ['lucide-svelte']
 	}
 });
