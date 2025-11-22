@@ -20,6 +20,9 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import AudioCompressor from '$lib/components/audio-compressor.svelte';
+	import ImageCompressor from '$lib/components/image-compressor.svelte';
+	import { DropZone } from '$lib/components/ui/drop-zone/index.js';
+	import { FileQueue, type QueuedFile, type FileStatus } from '$lib/components/ui/file-queue/index.js';
 
 	interface CompressionTarget {
 		label: string;
@@ -54,12 +57,10 @@
 	let isLoaded = $state(false);
 	let isProcessing = $state(false);
 	let progress = $state(0);
-	let selectedFile = $state<File | null>(null);
-	let processedVideo = $state<Uint8Array | null>(null);
-	let originalSize = $state(0);
-	let compressedSize = $state(0);
+	let queuedFiles = $state<QueuedFile[]>([]);
+	let currentProcessingIndex = $state(-1);
 	let errorMessage = $state('');
-	let videoMetadata = $state<VideoMetadata | null>(null);
+	let videoMetadataMap = $state<Map<string, VideoMetadata>>(new Map());
 	let message = $state('Initializing...');
 	let startTime = $state<number>(0);
 	let estimatedTimeRemaining = $state<number>(0);
@@ -69,6 +70,21 @@
 	let audioOnlyMode = $state(false);
 	let preserveOriginalFps = $state(false);
 	let activeTab = $state('video');
+
+	// Derived states for backward compatibility
+	const selectedFile = $derived(queuedFiles.length > 0 ? queuedFiles[0].file : null);
+	const videoMetadata = $derived(
+		selectedFile ? videoMetadataMap.get(queuedFiles[0]?.id) ?? null : null
+	);
+	const processedVideos = $derived(queuedFiles.filter((f) => f.status === 'completed'));
+	const originalSize = $derived(queuedFiles.reduce((sum, f) => sum + f.file.size, 0));
+	const compressedSize = $derived(
+		processedVideos.reduce((sum, f) => sum + (f.compressedSize ?? 0), 0)
+	);
+
+	const generateFileId = (): string => {
+		return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+	};
 
 	const getOptimalThreadCount = (): number => {
 		try {
@@ -148,32 +164,56 @@
 		}
 	};
 
-	const handleFileSelect = (event: Event): void => {
-		const target = event.target as HTMLInputElement;
-		const file = target.files?.[0];
+	const handleFilesSelected = (files: File[]): void => {
+		const maxSize = 5 * 1024 * 1024 * 1024;
+		const validFiles: File[] = [];
 
-		if (
-			file &&
-			(file.type.startsWith('video/') ||
+		for (const file of files) {
+			if (
+				file.type.startsWith('video/') ||
 				file.type === 'video/x-matroska' ||
 				file.type === 'application/x-matroska' ||
-				file.name.match(/\.(mp4|avi|mov|wmv|flv|webm|mkv|m4v|3gp|ogv)$/i))
-		) {
-			const maxSize = 5 * 1024 * 1024 * 1024;
-			if (file.size > maxSize) {
-				errorMessage = m.file_size_limit_error();
-				target.value = '';
-				return;
+				file.name.match(/\.(mp4|avi|mov|wmv|flv|webm|mkv|m4v|3gp|ogv)$/i)
+			) {
+				if (file.size > maxSize) {
+					errorMessage = m.file_size_limit_error();
+					continue;
+				}
+				validFiles.push(file);
 			}
-
-			selectedFile = file;
-			originalSize = file.size;
-			errorMessage = '';
-			processedVideo = null;
-			getVideoMetadata(file);
-		} else {
-			errorMessage = m.select_valid_video();
 		}
+
+		if (validFiles.length === 0 && files.length > 0) {
+			errorMessage = m.select_valid_video();
+			return;
+		}
+
+		errorMessage = '';
+
+		// Add files to queue
+		const newQueuedFiles: QueuedFile[] = validFiles.map((file) => ({
+			id: generateFileId(),
+			file,
+			status: 'pending' as FileStatus
+		}));
+
+		queuedFiles = [...queuedFiles, ...newQueuedFiles];
+
+		// Get metadata for each new file
+		for (const qf of newQueuedFiles) {
+			getVideoMetadataForFile(qf.id, qf.file);
+		}
+	};
+
+	const removeFileFromQueue = (id: string): void => {
+		queuedFiles = queuedFiles.filter((f) => f.id !== id);
+		videoMetadataMap.delete(id);
+		videoMetadataMap = new Map(videoMetadataMap);
+	};
+
+	const clearFileQueue = (): void => {
+		queuedFiles = [];
+		videoMetadataMap = new Map();
 	};
 
 	const detectVideoFps = async (file: File): Promise<number> => {
@@ -230,7 +270,7 @@
 		}
 	};
 
-	const getVideoMetadata = async (file: File): Promise<void> => {
+	const getVideoMetadataForFile = async (fileId: string, file: File): Promise<void> => {
 		try {
 			const video = document.createElement('video');
 			video.src = URL.createObjectURL(file);
@@ -250,7 +290,7 @@
 					const hasMotion = bitratePerPixel > 0.1 || estimatedBitrate > 3000;
 
 					// Set initial metadata with default FPS (will be detected in background)
-					videoMetadata = {
+					const metadata: VideoMetadata = {
 						duration: video.duration,
 						bitrate: estimatedBitrate,
 						resolution: `${video.videoWidth}x${video.videoHeight}`,
@@ -259,6 +299,8 @@
 						fps: 30, // Default, will be updated by background FPS detection
 						hasMotion
 					};
+					videoMetadataMap.set(fileId, metadata);
+					videoMetadataMap = new Map(videoMetadataMap);
 					URL.revokeObjectURL(video.src);
 					resolve();
 				};
@@ -267,16 +309,15 @@
 			// Detect FPS in background after basic metadata is loaded
 			detectVideoFps(file)
 				.then((fps) => {
-					if (videoMetadata) {
-						videoMetadata = { ...videoMetadata, fps };
-						console.log(`✓ Video FPS detected: ${fps} fps`);
+					const existingMetadata = videoMetadataMap.get(fileId);
+					if (existingMetadata) {
+						videoMetadataMap.set(fileId, { ...existingMetadata, fps });
+						videoMetadataMap = new Map(videoMetadataMap);
+						console.log(`✓ Video FPS detected for ${file.name}: ${fps} fps`);
 					}
 				})
 				.catch((error) => {
 					console.error('FPS detection failed, using fallback:', error);
-					if (videoMetadata) {
-						videoMetadata = { ...videoMetadata, fps: 30 };
-					}
 				});
 		} catch (error) {
 			console.error('Failed to get video metadata:', error);
@@ -368,8 +409,126 @@
 		};
 	};
 
+	const compressSingleVideo = async (queuedFile: QueuedFile): Promise<void> => {
+		if (!ffmpeg || !isLoaded) return;
+
+		const file = queuedFile.file;
+		const metadata = videoMetadataMap.get(queuedFile.id);
+		if (!metadata) {
+			throw new Error('No metadata found for file');
+		}
+
+		const inputDir = '/input';
+		await ffmpeg.createDir(inputDir);
+
+		message = `Mounting ${file.name}...`;
+		await ffmpeg.mount('WORKERFS' as any, { files: [file] }, inputDir);
+
+		try {
+			// If audio-only mode, use the dedicated logic
+			if (audioOnlyMode) {
+				message = `Processing audio for ${file.name}...`;
+
+				const args = ['-i', `${inputDir}/${file.name}`, '-c:v', 'copy'];
+
+				if (muteSound) {
+					args.push('-an');
+				} else {
+					args.push('-c:a', 'copy');
+				}
+
+				args.push('-movflags', '+faststart', '-f', 'mp4', '-y', 'output.mp4');
+				await ffmpeg.exec(args);
+			} else {
+				const settings = calculateCompressionSettings(
+					selectedTarget.value,
+					metadata,
+					preserveOriginalFps
+				);
+				const threadCount = isChromium ? getOptimalThreadCount() : 0;
+
+				message = `Compressing ${file.name}...`;
+
+				const args = [
+					'-i',
+					`${inputDir}/${file.name}`,
+					'-c:v',
+					'libx264',
+					'-preset',
+					'veryfast',
+					'-tune',
+					'film',
+					'-crf',
+					settings.crf.toString(),
+					'-maxrate',
+					settings.videoBitrate,
+					'-bufsize',
+					settings.bufferSize,
+					'-refs',
+					'1',
+					'-bf',
+					'0',
+					'-threads',
+					threadCount.toString(),
+					'-me_method',
+					'hex',
+					'-subq',
+					'3'
+				];
+
+				if (!muteSound) {
+					args.push('-c:a', 'aac', '-b:a', settings.audioBitrate, '-ac', '2', '-ar', '48000');
+				} else {
+					args.push('-an');
+				}
+
+				args.push('-movflags', '+faststart', '-f', 'mp4', '-y');
+
+				let videoFilters: string[] = [];
+
+				if (settings.resolution !== metadata.resolution) {
+					videoFilters.push(`scale=${settings.resolution}:flags=fast_bilinear`);
+				}
+
+				if (settings.targetFps < metadata.fps) {
+					videoFilters.push(`fps=${settings.targetFps}`);
+				}
+
+				if (videoFilters.length > 0) {
+					const filterComplex = videoFilters.join(',');
+					const audioCodecIndex = args.indexOf('-c:a');
+					if (audioCodecIndex !== -1) {
+						args.splice(audioCodecIndex, 0, '-vf', filterComplex);
+					} else {
+						args.splice(args.indexOf('-movflags'), 0, '-vf', filterComplex);
+					}
+				}
+
+				args.push('output.mp4');
+				console.log('FFmpeg args:', args);
+				await ffmpeg.exec(args);
+			}
+
+			message = `Reading compressed ${file.name}...`;
+			const data = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
+
+			// Update queued file with result
+			queuedFiles = queuedFiles.map((f) =>
+				f.id === queuedFile.id
+					? { ...f, status: 'completed' as FileStatus, result: data, compressedSize: data.length }
+					: f
+			);
+
+			await ffmpeg.deleteFile('output.mp4');
+		} finally {
+			await ffmpeg.unmount(inputDir);
+			await ffmpeg.deleteDir(inputDir);
+		}
+	};
+
 	const compressVideo = async (): Promise<void> => {
-		if (!selectedFile || !isLoaded || !videoMetadata || !ffmpeg) return;
+		const pendingFiles = queuedFiles.filter((f) => f.status === 'pending');
+		if (pendingFiles.length === 0 || !isLoaded || !ffmpeg) return;
 
 		isProcessing = true;
 		progress = 0;
@@ -378,160 +537,57 @@
 		estimatedTimeRemaining = 0;
 
 		try {
-			const inputDir = '/input';
-			await ffmpeg.createDir(inputDir);
+			for (let i = 0; i < pendingFiles.length; i++) {
+				const queuedFile = pendingFiles[i];
+				currentProcessingIndex = i;
 
-			message = 'Mounting input file...';
-			await ffmpeg.mount('WORKERFS' as any, { files: [selectedFile] }, inputDir);
+				// Update status to processing
+				queuedFiles = queuedFiles.map((f) =>
+					f.id === queuedFile.id ? { ...f, status: 'processing' as FileStatus } : f
+				);
 
-			// If audio-only mode, use the dedicated logic
-			if (audioOnlyMode) {
-				message = 'Processing audio only...';
-
-				const args = [
-					'-i',
-					`${inputDir}/${selectedFile.name}`,
-					'-c:v',
-					'copy' // Copy video stream without re-encoding
-				];
-
-				// Handle audio based on muteSound setting
-				if (muteSound) {
-					args.push('-an'); // Remove audio completely
-				} else {
-					// Keep original audio
-					args.push('-c:a', 'copy');
+				try {
+					await compressSingleVideo(queuedFile);
+					message = `Completed ${i + 1}/${pendingFiles.length} files`;
+				} catch (error) {
+					console.error(`Compression failed for ${queuedFile.file.name}:`, error);
+					queuedFiles = queuedFiles.map((f) =>
+						f.id === queuedFile.id
+							? { ...f, status: 'error' as FileStatus, error: String(error) }
+							: f
+					);
 				}
-
-				args.push('-movflags', '+faststart', '-f', 'mp4', '-y', 'output.mp4');
-
-				console.log('FFmpeg audio-only args:', args);
-
-				await ffmpeg.exec(args);
-
-				message = 'Reading processed video...';
-				const data = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
-				processedVideo = data;
-				compressedSize = data.length;
-
-				await ffmpeg.unmount(inputDir);
-				await ffmpeg.deleteDir(inputDir);
-				await ffmpeg.deleteFile('output.mp4');
-
-				message = 'Audio processing completed successfully!';
-				return;
 			}
 
-			const settings = calculateCompressionSettings(
-				selectedTarget.value,
-				videoMetadata,
-				preserveOriginalFps
-			);
-			const threadCount = isChromium ? getOptimalThreadCount() : 0;
-
-			message = 'Starting compression...';
-
-			const args = [
-				'-i',
-				`${inputDir}/${selectedFile.name}`,
-				'-c:v',
-				'libx264',
-				'-preset',
-				'veryfast',
-				'-tune',
-				'film',
-				'-crf',
-				settings.crf.toString(),
-				'-maxrate',
-				settings.videoBitrate,
-				'-bufsize',
-				settings.bufferSize,
-				'-refs',
-				'1',
-				'-bf',
-				'0',
-				'-threads',
-				threadCount.toString(),
-				'-me_method',
-				'hex',
-				'-subq',
-				'3'
-			];
-
-			// Add audio settings only if not muting sound
-			if (!muteSound) {
-				args.push('-c:a', 'aac', '-b:a', settings.audioBitrate, '-ac', '2', '-ar', '48000');
-			} else {
-				// Remove audio completely
-				args.push('-an');
-			}
-
-			args.push('-movflags', '+faststart', '-f', 'mp4', '-y');
-
-			let videoFilters: string[] = [];
-
-			if (settings.resolution !== videoMetadata.resolution) {
-				videoFilters.push(`scale=${settings.resolution}:flags=fast_bilinear`);
-			}
-
-			if (settings.targetFps < videoMetadata.fps) {
-				videoFilters.push(`fps=${settings.targetFps}`);
-			}
-
-			if (videoFilters.length > 0) {
-				const filterComplex = videoFilters.join(',');
-				const audioCodecIndex = args.indexOf('-c:a');
-				args.splice(audioCodecIndex, 0, '-vf', filterComplex);
-			}
-
-			args.push('output.mp4');
-
-			console.log('FFmpeg args:', args);
-
-			await ffmpeg.exec(args);
-
-			message = 'Reading compressed video...';
-			const data = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
-			processedVideo = data;
-			compressedSize = data.length;
-
-			await ffmpeg.unmount(inputDir);
-			await ffmpeg.deleteDir(inputDir);
-			await ffmpeg.deleteFile('output.mp4');
-
-			message = 'Compression completed successfully!';
+			const completedCount = queuedFiles.filter((f) => f.status === 'completed').length;
+			message = `Compression completed! ${completedCount}/${pendingFiles.length} files processed.`;
 		} catch (error) {
-			console.error('Compression failed:', error);
-			errorMessage = 'Video compression failed. Please try again with different settings.';
+			console.error('Batch compression failed:', error);
+			errorMessage = 'Video compression failed. Please try again.';
 			message = 'Compression failed';
 		} finally {
 			isProcessing = false;
 			progress = 0;
 			startTime = 0;
 			estimatedTimeRemaining = 0;
+			currentProcessingIndex = -1;
 		}
 	};
 
-	const downloadVideo = (): void => {
-		if (!processedVideo) return;
+	const downloadSingleVideo = (queuedFile: QueuedFile): void => {
+		if (!queuedFile.result) return;
 
-		console.log('Download button clicked, processedVideo size:', processedVideo.length);
-		console.log('Audio only mode:', audioOnlyMode, 'Mute sound:', muteSound);
-
-		// Always use video/mp4 as MIME type since we're outputting MP4 format
-		const blob = new Blob([new Uint8Array(processedVideo as Uint8Array)], { type: 'video/mp4' });
+		const blob = new Blob([new Uint8Array(queuedFile.result)], { type: 'video/mp4' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 
 		let filename = '';
 		if (audioOnlyMode) {
 			const audioStatus = muteSound ? 'no_audio' : 'with_audio';
-			filename = `${audioStatus}_${selectedFile?.name || 'video.mp4'}`;
+			filename = `${audioStatus}_${queuedFile.file.name}`;
 		} else {
-			filename = `compressed_${selectedTarget?.label?.replace(' ', '') || 'unknown'}_${selectedFile?.name || 'video.mp4'}`;
+			filename = `compressed_${selectedTarget?.label?.replace(' ', '') || 'unknown'}_${queuedFile.file.name}`;
 		}
-
-		console.log('Generated filename:', filename);
 
 		a.download = filename;
 		a.href = url;
@@ -539,6 +595,25 @@
 		a.click();
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
+	};
+
+	const downloadAllVideos = async (): Promise<void> => {
+		const completedFiles = queuedFiles.filter((f) => f.status === 'completed' && f.result);
+		if (completedFiles.length === 0) return;
+
+		// If only one file, download directly
+		if (completedFiles.length === 1) {
+			downloadSingleVideo(completedFiles[0]);
+			return;
+		}
+
+		// For multiple files, download each one
+		// (JSZip will be added later for ZIP download)
+		for (const file of completedFiles) {
+			downloadSingleVideo(file);
+			// Small delay to prevent browser blocking multiple downloads
+			await new Promise((resolve) => setTimeout(resolve, 500));
+		}
 	};
 
 	const formatFileSize = (bytes: number): string => {
@@ -627,6 +702,7 @@
 			<Tabs.List>
 				<Tabs.Trigger value="video">{m.tab_video()}</Tabs.Trigger>
 				<Tabs.Trigger value="audio">{m.tab_audio()}</Tabs.Trigger>
+				<Tabs.Trigger value="image">{m.tab_image?.() ?? 'Image'}</Tabs.Trigger>
 			</Tabs.List>
 		</div>
 
@@ -639,14 +715,20 @@
 			</Card.Header>
 			<Card.Content class="space-y-4">
 				<div>
-					<Label for="video-upload">{m.choose_video_file()}</Label>
-					<Input
-						id="video-upload"
-						type="file"
-						accept="video/*"
-						onchange={handleFileSelect}
-						disabled={!isLoaded}
+					<Label>{m.choose_video_file()}</Label>
+					<DropZone
+						accept="video/*,.mp4,.avi,.mov,.wmv,.flv,.webm,.mkv,.m4v,.3gp,.ogv"
+						disabled={!isLoaded || isProcessing}
+						multiple={true}
+						onFilesSelected={handleFilesSelected}
 						class="mt-2"
+					/>
+					<FileQueue
+						files={queuedFiles}
+						onRemove={removeFileFromQueue}
+						onClearAll={clearFileQueue}
+						disabled={isProcessing}
+						class="mt-3"
 					/>
 				</div>
 
@@ -778,13 +860,21 @@
 
 				<Button
 					onclick={compressVideo}
-					disabled={!selectedFile || !isLoaded || isProcessing}
+					disabled={queuedFiles.filter((f) => f.status === 'pending').length === 0 ||
+						!isLoaded ||
+						isProcessing}
 					class="w-full"
 				>
 					{#if isProcessing}
 						{audioOnlyMode ? m.processing_audio() : m.compressing()}
+						{#if queuedFiles.length > 1}
+							({currentProcessingIndex + 1}/{queuedFiles.filter((f) => f.status !== 'completed').length})
+						{/if}
 					{:else}
 						{audioOnlyMode ? m.process_audio_only() : m.compress_video()}
+						{#if queuedFiles.filter((f) => f.status === 'pending').length > 1}
+							({queuedFiles.filter((f) => f.status === 'pending').length} {m.files_label?.() ?? 'files'})
+						{/if}
 					{/if}
 				</Button>
 
@@ -814,8 +904,9 @@
 				<Card.Description>{m.results_description()}</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-4">
-				{#if processedVideo}
+				{#if processedVideos.length > 0}
 					<div class="space-y-3">
+						<!-- Summary stats -->
 						<div class="flex items-center justify-between">
 							<span class="text-sm font-medium">{m.original_size()}:</span>
 							<Badge variant="secondary">{formatFileSize(originalSize)}</Badge>
@@ -833,23 +924,59 @@
 							<Badge variant="outline">{compressionRatio.toFixed(1)}%</Badge>
 						</div>
 
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.target_met()}:</span>
-							<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
-								{compressedSize <= selectedTarget.value ? m.yes() : m.no()}
-							</Badge>
-						</div>
+						{#if processedVideos.length === 1}
+							<div class="flex items-center justify-between">
+								<span class="text-sm font-medium">{m.target_met()}:</span>
+								<Badge
+									variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}
+								>
+									{compressedSize <= selectedTarget.value ? m.yes() : m.no()}
+								</Badge>
+							</div>
 
-						{#if compressedSize > selectedTarget.value}
-							<Alert.Root>
-								<Alert.Description>
-									{m.target_size_warning()}
-								</Alert.Description>
-							</Alert.Root>
+							{#if compressedSize > selectedTarget.value}
+								<Alert.Root>
+									<Alert.Description>
+										{m.target_size_warning()}
+									</Alert.Description>
+								</Alert.Root>
+							{/if}
 						{/if}
 
-						<Button onclick={downloadVideo} class="w-full">
-							{m.download_compressed()}
+						<!-- Individual file results for batch -->
+						{#if processedVideos.length > 1}
+							<div class="mt-4 space-y-2">
+								<h4 class="text-sm font-medium">
+									{m.processed_files?.() ?? 'Processed Files'} ({processedVideos.length})
+								</h4>
+								<div class="max-h-[150px] space-y-1 overflow-y-auto rounded-md border p-2">
+									{#each processedVideos as pv (pv.id)}
+										<div
+											class="flex items-center justify-between rounded p-2 text-sm hover:bg-accent/50"
+										>
+											<span class="truncate" title={pv.file.name}>{pv.file.name}</span>
+											<div class="flex items-center gap-2">
+												<span class="text-xs text-muted-foreground">
+													{formatFileSize(pv.file.size)} → {formatFileSize(pv.compressedSize ?? 0)}
+												</span>
+												<Button
+													variant="ghost"
+													size="sm"
+													onclick={() => downloadSingleVideo(pv)}
+												>
+													{m.download?.() ?? 'Download'}
+												</Button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						<Button onclick={downloadAllVideos} class="w-full">
+							{processedVideos.length > 1
+								? (m.download_all?.() ?? 'Download All')
+								: m.download_compressed()}
 						</Button>
 					</div>
 				{:else}
@@ -871,6 +998,10 @@
 				bind:estimatedTimeRemaining
 				{isChromium}
 			/>
+		</Tabs.Content>
+
+		<Tabs.Content value="image">
+			<ImageCompressor />
 		</Tabs.Content>
 	</Tabs.Root>
 

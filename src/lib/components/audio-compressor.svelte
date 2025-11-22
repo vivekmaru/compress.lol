@@ -7,9 +7,10 @@
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as m from '$lib/paraglide/messages.js';
+	import { DropZone } from '$lib/components/ui/drop-zone/index.js';
+	import { FileQueue, type QueuedFile, type FileStatus } from '$lib/components/ui/file-queue/index.js';
 
 	interface AudioFormat {
 		label: string;
@@ -46,13 +47,26 @@
 	}: Props = $props();
 
 	let isProcessing = $state(false);
-	let selectedFile = $state<File | null>(null);
-	let processedAudio = $state<Uint8Array | null>(null);
-	let originalSize = $state(0);
-	let compressedSize = $state(0);
+	let queuedFiles = $state<QueuedFile[]>([]);
+	let currentProcessingIndex = $state(-1);
 	let errorMessage = $state('');
-	let audioMetadata = $state<AudioMetadata | null>(null);
+	let audioMetadataMap = $state<Map<string, AudioMetadata>>(new Map());
 	let startTime = $state<number>(0);
+
+	// Derived states
+	const selectedFile = $derived(queuedFiles.length > 0 ? queuedFiles[0].file : null);
+	const audioMetadata = $derived(
+		selectedFile ? audioMetadataMap.get(queuedFiles[0]?.id) ?? null : null
+	);
+	const processedAudios = $derived(queuedFiles.filter((f) => f.status === 'completed'));
+	const originalSize = $derived(queuedFiles.reduce((sum, f) => sum + f.file.size, 0));
+	const compressedSize = $derived(
+		processedAudios.reduce((sum, f) => sum + (f.compressedSize ?? 0), 0)
+	);
+
+	const generateFileId = (): string => {
+		return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+	};
 
 	const audioFormats: AudioFormat[] = [
 		{ label: 'MP3', value: 'mp3', extension: '.mp3', codec: 'libmp3lame', description: 'Universal compatibility' },
@@ -75,33 +89,57 @@
 	let selectedQualityValue = $state('medium');
 	let selectedQuality = $state(qualitySettings[1]);
 
-	const handleFileSelect = (event: Event): void => {
-		const target = event.target as HTMLInputElement;
-		const file = target.files?.[0];
+	const handleFilesSelected = (files: File[]): void => {
+		const maxSize = 5 * 1024 * 1024 * 1024;
+		const validFiles: File[] = [];
 
-		if (
-			file &&
-			(file.type.startsWith('audio/') ||
-				file.name.match(/\.(mp3|aac|ogg|opus|wav|flac|m4a|wma|ape|alac|aiff|webm)$/i))
-		) {
-			const maxSize = 5 * 1024 * 1024 * 1024;
-			if (file.size > maxSize) {
-				errorMessage = m.file_size_limit_error();
-				target.value = '';
-				return;
+		for (const file of files) {
+			if (
+				file.type.startsWith('audio/') ||
+				file.name.match(/\.(mp3|aac|ogg|opus|wav|flac|m4a|wma|ape|alac|aiff|webm)$/i)
+			) {
+				if (file.size > maxSize) {
+					errorMessage = m.file_size_limit_error();
+					continue;
+				}
+				validFiles.push(file);
 			}
+		}
 
-			selectedFile = file;
-			originalSize = file.size;
-			errorMessage = '';
-			processedAudio = null;
-			getAudioMetadata(file);
-		} else {
+		if (validFiles.length === 0 && files.length > 0) {
 			errorMessage = m.select_valid_audio();
+			return;
+		}
+
+		errorMessage = '';
+
+		// Add files to queue
+		const newQueuedFiles: QueuedFile[] = validFiles.map((file) => ({
+			id: generateFileId(),
+			file,
+			status: 'pending' as FileStatus
+		}));
+
+		queuedFiles = [...queuedFiles, ...newQueuedFiles];
+
+		// Get metadata for each new file
+		for (const qf of newQueuedFiles) {
+			getAudioMetadataForFile(qf.id, qf.file);
 		}
 	};
 
-	const getAudioMetadata = async (file: File): Promise<void> => {
+	const removeFileFromQueue = (id: string): void => {
+		queuedFiles = queuedFiles.filter((f) => f.id !== id);
+		audioMetadataMap.delete(id);
+		audioMetadataMap = new Map(audioMetadataMap);
+	};
+
+	const clearFileQueue = (): void => {
+		queuedFiles = [];
+		audioMetadataMap = new Map();
+	};
+
+	const getAudioMetadataForFile = async (fileId: string, file: File): Promise<void> => {
 		try {
 			const audio = document.createElement('audio');
 			audio.src = URL.createObjectURL(file);
@@ -110,13 +148,15 @@
 				audio.onloadedmetadata = () => {
 					const estimatedBitrate = Math.round((file.size * 8) / audio.duration / 1000);
 
-					audioMetadata = {
+					const metadata: AudioMetadata = {
 						duration: audio.duration,
 						bitrate: estimatedBitrate,
 						size: file.size,
 						sampleRate: 44100, // Default, actual value would need FFmpeg probe
 						channels: 2 // Default stereo
 					};
+					audioMetadataMap.set(fileId, metadata);
+					audioMetadataMap = new Map(audioMetadataMap);
 					URL.revokeObjectURL(audio.src);
 					resolve();
 				};
@@ -126,25 +166,20 @@
 		}
 	};
 
-	const compressAudio = async (): Promise<void> => {
-		if (!selectedFile || !isLoaded || !ffmpeg) return;
+	const compressSingleAudio = async (queuedFile: QueuedFile): Promise<void> => {
+		if (!ffmpeg || !isLoaded) return;
 
-		isProcessing = true;
-		progress = 0;
-		errorMessage = '';
-		startTime = Date.now();
-		estimatedTimeRemaining = 0;
+		const file = queuedFile.file;
+		const inputDir = '/input';
+		await ffmpeg.createDir(inputDir);
+
+		message = `Mounting ${file.name}...`;
+		await ffmpeg.mount('WORKERFS' as any, { files: [file] }, inputDir);
 
 		try {
-			const inputDir = '/input';
-			await ffmpeg.createDir(inputDir);
+			message = `Compressing ${file.name}...`;
 
-			message = 'Mounting input file...';
-			await ffmpeg.mount('WORKERFS' as any, { files: [selectedFile] }, inputDir);
-
-			message = 'Compressing audio...';
-
-			const args = ['-i', `${inputDir}/${selectedFile.name}`];
+			const args = ['-i', `${inputDir}/${file.name}`];
 
 			// Audio codec and format specific settings
 			if (selectedFormat.value === 'mp3') {
@@ -152,8 +187,12 @@
 			} else if (selectedFormat.value === 'aac' || selectedFormat.value === 'm4a') {
 				args.push('-c:a', 'aac', '-b:a', selectedQuality.bitrate);
 			} else if (selectedFormat.value === 'opus') {
-				// Opus has different bitrate ranges (6k-510k)
-				const opusBitrate = selectedQuality.value === 'high' ? '256k' : selectedQuality.value === 'medium' ? '128k' : '96k';
+				const opusBitrate =
+					selectedQuality.value === 'high'
+						? '256k'
+						: selectedQuality.value === 'medium'
+							? '128k'
+							: '96k';
 				args.push('-c:a', 'libopus', '-b:a', opusBitrate);
 			} else if (selectedFormat.value === 'ogg') {
 				args.push('-c:a', 'libvorbis', '-b:a', selectedQuality.bitrate);
@@ -163,56 +202,97 @@
 				args.push('-c:a', 'flac', '-compression_level', '8');
 			}
 
-			// Output format
 			args.push('-f', selectedFormat.value === 'm4a' ? 'mp4' : selectedFormat.value);
 			args.push('-y', `output${selectedFormat.extension}`);
 
 			console.log('FFmpeg audio args:', args);
-
 			await ffmpeg.exec(args);
 
-			message = 'Reading compressed audio...';
+			message = `Reading compressed ${file.name}...`;
 			const data = (await ffmpeg.readFile(`output${selectedFormat.extension}`)) as Uint8Array;
-			processedAudio = data;
-			compressedSize = data.length;
 
+			// Update queued file with result
+			queuedFiles = queuedFiles.map((f) =>
+				f.id === queuedFile.id
+					? { ...f, status: 'completed' as FileStatus, result: data, compressedSize: data.length }
+					: f
+			);
+
+			await ffmpeg.deleteFile(`output${selectedFormat.extension}`);
+		} finally {
 			await ffmpeg.unmount(inputDir);
 			await ffmpeg.deleteDir(inputDir);
-			await ffmpeg.deleteFile(`output${selectedFormat.extension}`);
+		}
+	};
 
-			message = 'Audio compression completed successfully!';
+	const compressAudio = async (): Promise<void> => {
+		const pendingFiles = queuedFiles.filter((f) => f.status === 'pending');
+		if (pendingFiles.length === 0 || !isLoaded || !ffmpeg) return;
+
+		isProcessing = true;
+		progress = 0;
+		errorMessage = '';
+		startTime = Date.now();
+		estimatedTimeRemaining = 0;
+
+		try {
+			for (let i = 0; i < pendingFiles.length; i++) {
+				const queuedFile = pendingFiles[i];
+				currentProcessingIndex = i;
+
+				// Update status to processing
+				queuedFiles = queuedFiles.map((f) =>
+					f.id === queuedFile.id ? { ...f, status: 'processing' as FileStatus } : f
+				);
+
+				try {
+					await compressSingleAudio(queuedFile);
+					message = `Completed ${i + 1}/${pendingFiles.length} files`;
+				} catch (error) {
+					console.error(`Compression failed for ${queuedFile.file.name}:`, error);
+					queuedFiles = queuedFiles.map((f) =>
+						f.id === queuedFile.id
+							? { ...f, status: 'error' as FileStatus, error: String(error) }
+							: f
+					);
+				}
+			}
+
+			const completedCount = queuedFiles.filter((f) => f.status === 'completed').length;
+			message = `Compression completed! ${completedCount}/${pendingFiles.length} files processed.`;
 		} catch (error) {
-			console.error('Audio compression failed:', error);
-			errorMessage = 'Audio compression failed. Please try again with different settings.';
+			console.error('Batch compression failed:', error);
+			errorMessage = 'Audio compression failed. Please try again.';
 			message = 'Compression failed';
 		} finally {
 			isProcessing = false;
 			progress = 0;
 			startTime = 0;
 			estimatedTimeRemaining = 0;
+			currentProcessingIndex = -1;
 		}
 	};
 
-	const downloadAudio = (): void => {
-		if (!processedAudio) return;
+	const mimeTypes: Record<string, string> = {
+		mp3: 'audio/mpeg',
+		aac: 'audio/aac',
+		opus: 'audio/opus',
+		ogg: 'audio/ogg',
+		m4a: 'audio/mp4',
+		wav: 'audio/wav',
+		flac: 'audio/flac'
+	};
 
-		const mimeTypes: Record<string, string> = {
-			mp3: 'audio/mpeg',
-			aac: 'audio/aac',
-			opus: 'audio/opus',
-			ogg: 'audio/ogg',
-			m4a: 'audio/mp4',
-			wav: 'audio/wav',
-			flac: 'audio/flac'
-		};
+	const downloadSingleAudio = (queuedFile: QueuedFile): void => {
+		if (!queuedFile.result) return;
 
-		const blob = new Blob([new Uint8Array(processedAudio)], {
+		const blob = new Blob([new Uint8Array(queuedFile.result)], {
 			type: mimeTypes[selectedFormat.value] || 'audio/mpeg'
 		});
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 
-		const filename = `compressed_${selectedFormat.value}_${selectedFile?.name.replace(/\.[^/.]+$/, '')}${selectedFormat.extension}`;
+		const filename = `compressed_${selectedFormat.value}_${queuedFile.file.name.replace(/\.[^/.]+$/, '')}${selectedFormat.extension}`;
 
 		a.download = filename;
 		a.href = url;
@@ -220,6 +300,23 @@
 		a.click();
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
+	};
+
+	const downloadAllAudios = async (): Promise<void> => {
+		const completedFiles = queuedFiles.filter((f) => f.status === 'completed' && f.result);
+		if (completedFiles.length === 0) return;
+
+		// If only one file, download directly
+		if (completedFiles.length === 1) {
+			downloadSingleAudio(completedFiles[0]);
+			return;
+		}
+
+		// For multiple files, download each one
+		for (const file of completedFiles) {
+			downloadSingleAudio(file);
+			await new Promise((resolve) => setTimeout(resolve, 500));
+		}
 	};
 
 	const formatFileSize = (bytes: number): string => {
@@ -274,14 +371,20 @@
 		</Card.Header>
 		<Card.Content class="space-y-4">
 			<div>
-				<Label for="audio-upload">{m.choose_audio_file()}</Label>
-				<Input
-					id="audio-upload"
-					type="file"
-					accept="audio/*"
-					onchange={handleFileSelect}
-					disabled={!isLoaded}
+				<Label>{m.choose_audio_file()}</Label>
+				<DropZone
+					accept="audio/*,.mp3,.aac,.ogg,.opus,.wav,.flac,.m4a,.wma,.ape,.alac,.aiff,.webm"
+					disabled={!isLoaded || isProcessing}
+					multiple={true}
+					onFilesSelected={handleFilesSelected}
 					class="mt-2"
+				/>
+				<FileQueue
+					files={queuedFiles}
+					onRemove={removeFileFromQueue}
+					onClearAll={clearFileQueue}
+					disabled={isProcessing}
+					class="mt-3"
 				/>
 			</div>
 
@@ -346,13 +449,21 @@
 
 			<Button
 				onclick={compressAudio}
-				disabled={!selectedFile || !isLoaded || isProcessing}
+				disabled={queuedFiles.filter((f) => f.status === 'pending').length === 0 ||
+					!isLoaded ||
+					isProcessing}
 				class="w-full"
 			>
 				{#if isProcessing}
 					{m.compressing_audio()}
+					{#if queuedFiles.length > 1}
+						({currentProcessingIndex + 1}/{queuedFiles.filter((f) => f.status !== 'completed').length})
+					{/if}
 				{:else}
 					{m.compress_audio()}
+					{#if queuedFiles.filter((f) => f.status === 'pending').length > 1}
+						({queuedFiles.filter((f) => f.status === 'pending').length} {m.files_label?.() ?? 'files'})
+					{/if}
 				{/if}
 			</Button>
 
@@ -380,8 +491,9 @@
 			<Card.Description>{m.audio_results_description()}</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
-			{#if processedAudio}
+			{#if processedAudios.length > 0}
 				<div class="space-y-3">
+					<!-- Summary stats -->
 					<div class="flex items-center justify-between">
 						<span class="text-sm font-medium">{m.original_size()}:</span>
 						<Badge variant="secondary">{formatFileSize(originalSize)}</Badge>
@@ -404,8 +516,36 @@
 						<Badge variant="secondary">{selectedFormat.label}</Badge>
 					</div>
 
-					<Button onclick={downloadAudio} class="w-full">
-						{m.download_compressed_audio()}
+					<!-- Individual file results for batch -->
+					{#if processedAudios.length > 1}
+						<div class="mt-4 space-y-2">
+							<h4 class="text-sm font-medium">
+								{m.processed_files?.() ?? 'Processed Files'} ({processedAudios.length})
+							</h4>
+							<div class="max-h-[150px] space-y-1 overflow-y-auto rounded-md border p-2">
+								{#each processedAudios as pa (pa.id)}
+									<div
+										class="flex items-center justify-between rounded p-2 text-sm hover:bg-accent/50"
+									>
+										<span class="truncate" title={pa.file.name}>{pa.file.name}</span>
+										<div class="flex items-center gap-2">
+											<span class="text-xs text-muted-foreground">
+												{formatFileSize(pa.file.size)} → {formatFileSize(pa.compressedSize ?? 0)}
+											</span>
+											<Button variant="ghost" size="sm" onclick={() => downloadSingleAudio(pa)}>
+												{m.download?.() ?? 'Download'}
+											</Button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<Button onclick={downloadAllAudios} class="w-full">
+						{processedAudios.length > 1
+							? (m.download_all?.() ?? 'Download All')
+							: m.download_compressed_audio()}
 					</Button>
 				</div>
 			{:else}
