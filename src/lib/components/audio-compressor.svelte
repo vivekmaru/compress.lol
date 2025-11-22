@@ -5,12 +5,12 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as m from '$lib/paraglide/messages.js';
 	import { DropZone } from '$lib/components/ui/drop-zone/index.js';
 	import { FileQueue, type QueuedFile, type FileStatus } from '$lib/components/ui/file-queue/index.js';
+	import Loader from '@lucide/svelte/icons/loader-circle';
 
 	interface AudioFormat {
 		label: string;
@@ -363,166 +363,171 @@
 	};
 </script>
 
-<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+<div class="space-y-6">
+	<!-- Upload Section -->
 	<Card.Root>
-		<Card.Header>
-			<Card.Title>{m.upload_audio()}</Card.Title>
-			<Card.Description>{m.upload_audio_description()}</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-4">
-			<div>
-				<Label>{m.choose_audio_file()}</Label>
-				<DropZone
-					accept="audio/*,.mp3,.aac,.ogg,.opus,.wav,.flac,.m4a,.wma,.ape,.alac,.aiff,.webm"
-					disabled={!isLoaded || isProcessing}
-					multiple={true}
-					onFilesSelected={handleFilesSelected}
-					class="mt-2"
-				/>
-				<FileQueue
-					files={queuedFiles}
-					onRemove={removeFileFromQueue}
-					onClearAll={clearFileQueue}
-					disabled={isProcessing}
-					class="mt-3"
-				/>
-			</div>
-
-			{#if audioMetadata}
-				<div class="space-y-2">
-					<h4 class="font-medium">{m.audio_information()}</h4>
-					<div class="grid grid-cols-2 gap-2 text-sm">
-						<div>{m.duration()}: {formatDuration(audioMetadata.duration)}</div>
-						<div>{m.bitrate()}: {audioMetadata.bitrate} kbps</div>
-						<div>{m.size()}: {formatFileSize(audioMetadata.size)}</div>
-						<div>{m.sample_rate()}: {audioMetadata.sampleRate} Hz</div>
-						<div>{m.channels()}: {audioMetadata.channels}</div>
-					</div>
-				</div>
-			{/if}
-
-			<div>
-				<Label>{m.output_format()}</Label>
-				<Select.Root type="single" value={selectedFormatValue} onValueChange={handleFormatChange}>
-					<Select.Trigger class="mt-2 w-full">
-						{selectedFormatValue || m.select_output_format()}
-					</Select.Trigger>
-					<Select.Content>
-						{#each audioFormats as format}
-							<Select.Item value={format.label}>
-								{format.label} - {format.description}
-							</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-
-			<div>
-				<Label>{m.quality()}</Label>
-				<Select.Root type="single" value={selectedQualityValue} onValueChange={handleQualityChange}>
-					<Select.Trigger class="mt-2 w-full">
-						{selectedQualityValue}
-					</Select.Trigger>
-					<Select.Content>
-						{#each qualitySettings as quality}
-							<Select.Item value={quality.label}>
-								{quality.label} ({quality.bitrate})
-							</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-
-			{#if errorMessage}
-				<Alert.Root class="border-destructive">
-					<Alert.Description>{errorMessage}</Alert.Description>
-				</Alert.Root>
-			{/if}
-
-			{#if isChromium}
-				<Alert.Root class="mt-2">
-					<Alert.Description>
-						{m.chromium_warning()}
-					</Alert.Description>
-				</Alert.Root>
-			{/if}
-
-			<Button
-				onclick={compressAudio}
-				disabled={queuedFiles.filter((f) => f.status === 'pending').length === 0 ||
-					!isLoaded ||
-					isProcessing}
-				class="w-full"
-			>
-				{#if isProcessing}
-					{m.compressing_audio()}
-					{#if queuedFiles.length > 1}
-						({currentProcessingIndex + 1}/{queuedFiles.filter((f) => f.status !== 'completed').length})
-					{/if}
-				{:else}
-					{m.compress_audio()}
-					{#if queuedFiles.filter((f) => f.status === 'pending').length > 1}
-						({queuedFiles.filter((f) => f.status === 'pending').length} {m.files_label?.() ?? 'files'})
-					{/if}
-				{/if}
-			</Button>
-
-			{#if isProcessing && progress > 0}
-				<div class="space-y-2">
-					<div class="flex justify-between text-sm">
-						<span>{m.progress()}</span>
-						<div class="flex items-center gap-2">
-							<span>{progress}%</span>
-							{#if estimatedTimeRemaining > 0}
-								<span class="text-muted-foreground">• ~{formatTimeRemaining(estimatedTimeRemaining)}</span>
-							{/if}
-						</div>
-					</div>
-					<Progress value={progress} class="w-full" />
-					<p class="text-center text-xs text-muted-foreground">{message}</p>
-				</div>
-			{/if}
+		<Card.Content class="pt-6">
+			<DropZone
+				accept="audio/*,.mp3,.aac,.ogg,.opus,.wav,.flac,.m4a,.wma,.ape,.alac,.aiff,.webm"
+				disabled={!isLoaded || isProcessing}
+				multiple={true}
+				onFilesSelected={handleFilesSelected}
+				size="large"
+				showPrivacyBadge={true}
+			/>
+			<FileQueue
+				files={queuedFiles}
+				onRemove={removeFileFromQueue}
+				onClearAll={clearFileQueue}
+				disabled={isProcessing}
+				class="mt-4"
+			/>
 		</Card.Content>
 	</Card.Root>
 
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>{m.audio_results()}</Card.Title>
-			<Card.Description>{m.audio_results_description()}</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-4">
-			{#if processedAudios.length > 0}
+	<!-- Configuration Section (only show when files are selected) -->
+	{#if queuedFiles.length > 0}
+		<Card.Root>
+			<Card.Content class="space-y-6 pt-6">
+				{#if audioMetadata}
+					<div class="space-y-2">
+						<h4 class="text-sm font-medium">{m.audio_information()}</h4>
+						<div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+							<div class="rounded-md bg-muted/50 p-2 text-center">
+								<div class="text-xs text-muted-foreground">{m.duration()}</div>
+								<div class="font-medium">{formatDuration(audioMetadata.duration)}</div>
+							</div>
+							<div class="rounded-md bg-muted/50 p-2 text-center">
+								<div class="text-xs text-muted-foreground">{m.bitrate()}</div>
+								<div class="font-medium">{audioMetadata.bitrate} kbps</div>
+							</div>
+							<div class="rounded-md bg-muted/50 p-2 text-center">
+								<div class="text-xs text-muted-foreground">{m.size()}</div>
+								<div class="font-medium">{formatFileSize(audioMetadata.size)}</div>
+							</div>
+							<div class="rounded-md bg-muted/50 p-2 text-center">
+								<div class="text-xs text-muted-foreground">{m.channels()}</div>
+								<div class="font-medium">{audioMetadata.channels}ch</div>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div>
+						<Label>{m.output_format()}</Label>
+						<Select.Root type="single" value={selectedFormatValue} onValueChange={handleFormatChange}>
+							<Select.Trigger class="mt-2 w-full">
+								{selectedFormatValue || m.select_output_format()}
+							</Select.Trigger>
+							<Select.Content>
+								{#each audioFormats as format}
+									<Select.Item value={format.label}>
+										{format.label} - {format.description}
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</div>
+
+					<div>
+						<Label>{m.quality()}</Label>
+						<Select.Root type="single" value={selectedQualityValue} onValueChange={handleQualityChange}>
+							<Select.Trigger class="mt-2 w-full">
+								{selectedQualityValue}
+							</Select.Trigger>
+							<Select.Content>
+								{#each qualitySettings as quality}
+									<Select.Item value={quality.label}>
+										{quality.label} ({quality.bitrate})
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</div>
+				</div>
+
+				{#if errorMessage}
+					<Alert.Root class="border-destructive">
+						<Alert.Description>{errorMessage}</Alert.Description>
+					</Alert.Root>
+				{/if}
+
+				<Button
+					onclick={compressAudio}
+					disabled={queuedFiles.filter((f) => f.status === 'pending').length === 0 ||
+						!isLoaded ||
+						isProcessing}
+					class="h-12 w-full text-base font-semibold"
+					size="lg"
+				>
+					{#if isProcessing}
+						<Loader class="mr-2 h-5 w-5 animate-spin" />
+						{m.compressing_audio()}
+						{#if queuedFiles.length > 1}
+							({currentProcessingIndex + 1}/{queuedFiles.filter((f) => f.status !== 'completed').length})
+						{/if}
+					{:else}
+						{m.compress_audio()}
+						{#if queuedFiles.filter((f) => f.status === 'pending').length > 1}
+							({queuedFiles.filter((f) => f.status === 'pending').length} {m.files_label?.() ?? 'files'})
+						{/if}
+					{/if}
+				</Button>
+
+				{#if isProcessing && progress > 0}
+					<div class="space-y-2">
+						<div class="flex justify-between text-sm">
+							<span>{m.progress()}</span>
+							<div class="flex items-center gap-2">
+								<span>{progress}%</span>
+								{#if estimatedTimeRemaining > 0}
+									<span class="text-muted-foreground">• ~{formatTimeRemaining(estimatedTimeRemaining)}</span>
+								{/if}
+							</div>
+						</div>
+						<Progress value={progress} class="w-full" />
+						<p class="text-center text-xs text-muted-foreground">{message}</p>
+					</div>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	<!-- Results Section -->
+	{#if processedAudios.length > 0}
+		<Card.Root class="border-green-500/30 bg-green-500/5">
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2">
+					<span class="text-green-500">✓</span>
+					{m.audio_results()}
+				</Card.Title>
+			</Card.Header>
+			<Card.Content class="space-y-4">
 				<div class="space-y-3">
 					<!-- Summary stats -->
-					<div class="flex items-center justify-between">
-						<span class="text-sm font-medium">{m.original_size()}:</span>
-						<Badge variant="secondary">{formatFileSize(originalSize)}</Badge>
-					</div>
-
-					<div class="flex items-center justify-between">
-						<span class="text-sm font-medium">{m.compressed_size()}:</span>
-						<Badge variant="default">
-							{formatFileSize(compressedSize)}
-						</Badge>
-					</div>
-
-					<div class="flex items-center justify-between">
-						<span class="text-sm font-medium">{m.size_reduction()}:</span>
-						<Badge variant="outline">{compressionRatio.toFixed(1)}%</Badge>
-					</div>
-
-					<div class="flex items-center justify-between">
-						<span class="text-sm font-medium">{m.output_format()}:</span>
-						<Badge variant="secondary">{selectedFormat.label}</Badge>
+					<div class="grid grid-cols-3 gap-3 text-center">
+						<div class="rounded-lg bg-background p-3">
+							<div class="text-xs text-muted-foreground">{m.original_size()}</div>
+							<div class="font-semibold">{formatFileSize(originalSize)}</div>
+						</div>
+						<div class="rounded-lg bg-background p-3">
+							<div class="text-xs text-muted-foreground">{m.compressed_size()}</div>
+							<div class="font-semibold text-green-500">{formatFileSize(compressedSize)}</div>
+						</div>
+						<div class="rounded-lg bg-background p-3">
+							<div class="text-xs text-muted-foreground">{m.size_reduction()}</div>
+							<div class="font-semibold">{compressionRatio.toFixed(1)}%</div>
+						</div>
 					</div>
 
 					<!-- Individual file results for batch -->
 					{#if processedAudios.length > 1}
-						<div class="mt-4 space-y-2">
+						<div class="space-y-2">
 							<h4 class="text-sm font-medium">
 								{m.processed_files?.() ?? 'Processed Files'} ({processedAudios.length})
 							</h4>
-							<div class="max-h-[150px] space-y-1 overflow-y-auto rounded-md border p-2">
+							<div class="max-h-[150px] space-y-1 overflow-y-auto rounded-md border bg-background p-2">
 								{#each processedAudios as pa (pa.id)}
 									<div
 										class="flex items-center justify-between rounded p-2 text-sm hover:bg-accent/50"
@@ -542,17 +547,27 @@
 						</div>
 					{/if}
 
-					<Button onclick={downloadAllAudios} class="w-full">
+					<Button onclick={downloadAllAudios} class="h-12 w-full text-base font-semibold" size="lg">
 						{processedAudios.length > 1
 							? (m.download_all?.() ?? 'Download All')
 							: m.download_compressed_audio()}
 					</Button>
 				</div>
-			{:else}
-				<div class="py-8 text-center text-muted-foreground">
-					{m.upload_compress_audio_message()}
+			</Card.Content>
+		</Card.Root>
+	{:else if queuedFiles.length === 0}
+		<!-- Empty state with How it works -->
+		<Card.Root class="border-dashed">
+			<Card.Content class="py-8">
+				<div class="space-y-4 text-center">
+					<p class="text-sm text-muted-foreground">{m.select_a_file?.() ?? 'Select a file to get started'}</p>
+					<div class="mx-auto max-w-md space-y-2 text-left text-sm text-muted-foreground">
+						<p>🎵 <strong>Multiple formats</strong> - MP3, AAC, Opus, OGG, WAV, FLAC, M4A</p>
+						<p>🎚️ <strong>Quality control</strong> - Choose between high, medium, and low quality</p>
+						<p>🔒 <strong>100% private</strong> - All processing happens in your browser</p>
+					</div>
 				</div>
-			{/if}
-		</Card.Content>
-	</Card.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 </div>

@@ -671,7 +671,7 @@
 	<link rel="icon" href="/favicon.ico" />
 </svelte:head>
 
-<div class="container mx-auto max-w-2xl p-6">
+<div class="container mx-auto max-w-3xl p-6">
 	<div class="mb-4 flex items-center justify-center gap-4">
 		<h1 class="text-4xl font-bold">{m.app_title()}</h1>
 		<div class="flex items-center gap-2">
