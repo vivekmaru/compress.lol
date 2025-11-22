@@ -107,5 +107,15 @@
 	"max_width_description": "اضبط على 0 بدون حد. سيتم تغيير حجم الصور الأعرض.",
 	"smaller_file": "ملف أصغر",
 	"better_quality": "جودة أفضل",
-	"compression_failed": "فشل الضغط"
+	"compression_failed": "فشل الضغط",
+	"target_8mb": "٨ ميجابايت",
+	"target_8mb_hint": "Discord",
+	"target_25mb": "٢٥ ميجابايت",
+	"target_25mb_hint": "البريد الإلكتروني",
+	"target_50mb": "٥٠ ميجابايت",
+	"target_50mb_hint": "Slack",
+	"target_100mb": "١٠٠ ميجابايت",
+	"target_100mb_hint": "ملفات كبيرة",
+	"privacy_badge": "خاص 100% · الملفات لا تغادر جهازك أبداً",
+	"select_a_file": "اختر ملفاً للبدء"
 }

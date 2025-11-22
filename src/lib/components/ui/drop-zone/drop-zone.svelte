@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils/shadcn.js';
 	import Upload from '@lucide/svelte/icons/upload';
+	import Shield from '@lucide/svelte/icons/shield-check';
 	import * as m from '$lib/paraglide/messages.js';
 
 	interface Props {
@@ -9,6 +10,8 @@
 		multiple?: boolean;
 		onFilesSelected: (files: File[]) => void;
 		class?: string;
+		showPrivacyBadge?: boolean;
+		size?: 'default' | 'large';
 	}
 
 	let {
@@ -16,7 +19,9 @@
 		disabled = false,
 		multiple = false,
 		onFilesSelected,
-		class: className
+		class: className,
+		showPrivacyBadge = false,
+		size = 'default'
 	}: Props = $props();
 
 	let isDragging = $state(false);
@@ -115,7 +120,8 @@
 
 <div
 	class={cn(
-		'relative flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
+		'relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
+		size === 'large' ? 'min-h-[280px]' : 'min-h-[180px]',
 		isDragging
 			? 'border-primary bg-primary/10'
 			: 'border-muted-foreground/25 hover:border-primary/50 hover:bg-accent/50',
@@ -143,33 +149,43 @@
 		tabindex="-1"
 	/>
 
-	<div class="flex flex-col items-center gap-2 text-center">
+	<div class="flex flex-col items-center gap-3 text-center">
 		<div
 			class={cn(
-				'rounded-full p-3 transition-colors',
+				'rounded-full transition-colors',
+				size === 'large' ? 'p-4' : 'p-3',
 				isDragging ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
 			)}
 		>
-			<Upload class="h-6 w-6" />
+			<Upload class={cn(size === 'large' ? 'h-8 w-8' : 'h-6 w-6')} />
 		</div>
 
 		{#if isDragging}
-			<p class="text-sm font-medium text-primary">{m.drop_files_here?.() ?? 'Drop files here'}</p>
+			<p class={cn('font-medium text-primary', size === 'large' ? 'text-base' : 'text-sm')}>
+				{m.drop_files_here?.() ?? 'Drop files here'}
+			</p>
 		{:else}
 			<div class="space-y-1">
-				<p class="text-sm font-medium">
+				<p class={cn('font-medium', size === 'large' ? 'text-base' : 'text-sm')}>
 					{m.drag_and_drop?.() ?? 'Drag and drop files here'}
 				</p>
-				<p class="text-xs text-muted-foreground">
+				<p class={cn('text-muted-foreground', size === 'large' ? 'text-sm' : 'text-xs')}>
 					{m.or_click_to_browse?.() ?? 'or click to browse'}
 				</p>
 			</div>
 		{/if}
 
 		{#if multiple}
-			<p class="text-xs text-muted-foreground">
+			<p class={cn('text-muted-foreground', size === 'large' ? 'text-sm' : 'text-xs')}>
 				{m.multiple_files_supported?.() ?? 'Multiple files supported'}
 			</p>
+		{/if}
+
+		{#if showPrivacyBadge}
+			<div class="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+				<Shield class="h-3.5 w-3.5 text-green-500" />
+				<span>{m.privacy_badge?.() ?? '100% private · Files never leave your device'}</span>
+			</div>
 		{/if}
 	</div>
 </div>

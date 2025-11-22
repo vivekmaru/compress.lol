@@ -107,5 +107,15 @@
 	"max_width_description": "Mettez 0 pour aucune limite. Les images plus larges seront redimensionnées.",
 	"smaller_file": "Fichier plus petit",
 	"better_quality": "Meilleure qualité",
-	"compression_failed": "Échec de la compression"
+	"compression_failed": "Échec de la compression",
+	"target_8mb": "8 Mo",
+	"target_8mb_hint": "Discord",
+	"target_25mb": "25 Mo",
+	"target_25mb_hint": "Email",
+	"target_50mb": "50 Mo",
+	"target_50mb_hint": "Slack",
+	"target_100mb": "100 Mo",
+	"target_100mb_hint": "Fichiers volumineux",
+	"privacy_badge": "100% privé · Les fichiers ne quittent jamais votre appareil",
+	"select_a_file": "Sélectionnez un fichier pour commencer"
 }
