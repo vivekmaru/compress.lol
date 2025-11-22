@@ -1,4 +1,4 @@
-# 🎬 Compress.lol – WebAssembly-Powered Video Compression
+# 🎬 Compress.lol – WebAssembly-Powered Media Compression
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub issues](https://img.shields.io/github/issues/anhostfr/compress.lol)](https://github.com/anhostfr/compress.lol/issues)
@@ -6,19 +6,25 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-007808?style=flat&logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
 
-> **Compress.lol** – _"Crushing file sizes, not dreams"_ ⚡  
-> WebAssembly-powered video compression that runs entirely in your browser.
+> **Compress.lol** – _"Crushing file sizes, not dreams"_ ⚡
+> WebAssembly-powered media compression that runs entirely in your browser.
 
 ---
 
 ## ✨ Features
 
-- 🎯 **Target-size compression** with intelligent quality adjustment
-- 🧠 **Motion detection** for optimized encoding settings
+### Media Compression
+- 🎬 **Video compression** – Target-size compression (8MB, 25MB, 50MB, 100MB) with smart motion detection
+- 🎵 **Audio compression** – Convert and compress to MP3, AAC, Opus, OGG, WAV, FLAC, M4A
+- 🖼️ **Image compression** – Compress images to WebP, JPEG, PNG with quality control
+
+### User Experience
+- 📂 **Drag & drop upload** – Simply drag files onto the page
+- 📚 **Batch processing** – Queue multiple files and process them sequentially
 - ⚡ **Lightning-fast processing** using WebAssembly FFmpeg
-- 🔒 **100% client-side** – your videos never leave your device
+- 🔒 **100% client-side** – your files never leave your device
 - 📱 **Responsive design** – works on desktop and mobile
-- 🌍 **Multilingual interface** with Paraglide JS
+- 🌍 **Multilingual interface** – English, French, Polish, Arabic
 - 🎨 **Modern UI** with TailwindCSS, Shadcn/ui components, and Catppuccin themes
 
 ---
@@ -43,19 +49,27 @@ npm run dev
 
 ## 🎯 How It Works
 
-### Smart Compression Algorithm
+### Video Compression
 
 1. **Video Analysis**: Automatically detects motion levels, resolution, and encoding characteristics
 2. **Target-Based Encoding**: Calculates optimal bitrates and settings for your target file size
 3. **Motion-Aware Settings**: Adjusts encoding parameters based on content complexity
 4. **WebAssembly Processing**: Uses FFmpeg compiled to WASM for native-speed compression
 
-### Compression Targets
+**Target Sizes**: 8 MB (sharing) • 25 MB (social media) • 50 MB (email) • 100 MB (archival)
 
-- **8 MB** – Ultra compression for sharing
-- **25 MB** – High compression for social media
-- **50 MB** – Medium compression for email
-- **100 MB** – Low compression for archival
+### Audio Compression
+
+- Convert between formats: MP3, AAC, Opus, OGG, WAV, FLAC, M4A
+- Three quality presets: High, Medium, Low
+- Uses FFmpeg.wasm for audio transcoding
+
+### Image Compression
+
+- Output formats: WebP (best compression), JPEG, PNG
+- Quality slider from 1-100%
+- Optional max width constraint for resizing
+- Uses Canvas API for fast, efficient compression
 
 ---
 
@@ -97,7 +111,7 @@ Requires WebAssembly and SharedArrayBuffer support.
 
 ### File Size Limits
 
-- **Maximum file size**: 2GB (browser limitation)
+- **Maximum file size**: 5GB (browser memory limitation)
 
 ---
 

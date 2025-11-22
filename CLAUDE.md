@@ -8,6 +8,9 @@
 - Target-size video compression (8MB, 25MB, 50MB, 100MB)
 - Smart motion detection for optimized encoding
 - Audio compression with format conversion (MP3, AAC, Opus, OGG, WAV, FLAC, M4A)
+- Image compression with format conversion (WebP, JPEG, PNG) using Canvas API
+- Drag & drop file upload with visual feedback
+- Batch file processing (queue multiple files, process sequentially)
 - Multi-language support (English, French, Polish, Arabic)
 - Catppuccin theme support (Latte, Frappe, Macchiato, Mocha)
 - 100% client-side processing
@@ -31,16 +34,19 @@
 compress.lol/
 ├── src/
 │   ├── routes/
-│   │   ├── +page.svelte          # Main page with video/audio compression tabs
+│   │   ├── +page.svelte          # Main page with video/audio/image compression tabs
 │   │   └── +layout.svelte        # Root layout
 │   ├── lib/
 │   │   ├── components/
 │   │   │   ├── audio-compressor.svelte  # Audio compression component
+│   │   │   ├── image-compressor.svelte  # Image compression component (Canvas API)
 │   │   │   └── ui/                       # shadcn-svelte UI components
 │   │   │       ├── alert/
 │   │   │       ├── badge/
 │   │   │       ├── button/
 │   │   │       ├── card/
+│   │   │       ├── drop-zone/     # Drag & drop file upload component
+│   │   │       ├── file-queue/    # Batch file queue component
 │   │   │       ├── input/
 │   │   │       ├── label/
 │   │   │       ├── progress/
@@ -255,12 +261,20 @@ Located in `src/lib/components/ui/`:
 - `badge` - Status badges
 - `button` - Action buttons
 - `card` - Content cards
+- `drop-zone` - Drag & drop file upload with visual feedback
+- `file-queue` - Batch file queue with status indicators
 - `input` - Form inputs
 - `label` - Form labels
 - `progress` - Progress bars
 - `select` - Dropdown selects
 - `separator` - Visual separators
 - `tabs` - Tab navigation
+
+### Custom Components
+
+Located in `src/lib/components/`:
+- `audio-compressor.svelte` - Audio compression with format conversion
+- `image-compressor.svelte` - Image compression using Canvas API
 
 ### Adding New Components
 
