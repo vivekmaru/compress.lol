@@ -5,7 +5,6 @@
 	import { fetchFile, toBlobURL } from '@ffmpeg/util';
 	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -117,6 +116,8 @@
 
 	let selectedTargetValue = $state('25 MB');
 	let selectedTarget = $state(compressionTargets[1]);
+	let useCustomTarget = $state(false);
+	let customTargetMB = $state(10);
 
 	onMount(async (): Promise<void> => {
 		await loadFFmpeg();
@@ -440,8 +441,9 @@
 				args.push('-movflags', '+faststart', '-f', 'mp4', '-y', 'output.mp4');
 				await ffmpeg.exec(args);
 			} else {
+				const targetValue = useCustomTarget ? customTargetMB * 1024 * 1024 : selectedTarget.value;
 				const settings = calculateCompressionSettings(
-					selectedTarget.value,
+					targetValue,
 					metadata,
 					preserveOriginalFps
 				);
@@ -586,7 +588,8 @@
 			const audioStatus = muteSound ? 'no_audio' : 'with_audio';
 			filename = `${audioStatus}_${queuedFile.file.name}`;
 		} else {
-			filename = `compressed_${selectedTarget?.label?.replace(' ', '') || 'unknown'}_${queuedFile.file.name}`;
+			const targetLabel = useCustomTarget ? `${customTargetMB}MB` : (selectedTarget?.label?.replace(' ', '') || 'unknown');
+			filename = `compressed_${targetLabel}_${queuedFile.file.name}`;
 		}
 
 		a.download = filename;
@@ -641,8 +644,12 @@
 		compressedSize > 0 && originalSize > 0 ? (1 - compressedSize / originalSize) * 100 : 0
 	);
 
+	const effectiveTargetValue = $derived(
+		useCustomTarget ? customTargetMB * 1024 * 1024 : selectedTarget.value
+	);
+
 	const isFileSmallerThanTarget = $derived(
-		!!selectedTarget && originalSize > 0 && originalSize < selectedTarget.value
+		originalSize > 0 && originalSize < effectiveTargetValue
 	);
 
 	const handleTargetChange = (value: string | undefined): void => {
@@ -651,7 +658,18 @@
 		const target = compressionTargets.find((t) => t.label === value);
 		if (target) {
 			selectedTarget = target;
+			useCustomTarget = false;
 		}
+	};
+
+	const handleCustomTargetSelect = (): void => {
+		useCustomTarget = true;
+	};
+
+	const handlePresetSelect = (target: CompressionTarget): void => {
+		selectedTarget = target;
+		selectedTargetValue = target.label;
+		useCustomTarget = false;
 	};
 </script>
 
@@ -752,16 +770,46 @@
 
 				<div>
 					<Label>{m.target_size()}</Label>
-					<Select.Root type="single" value={selectedTargetValue} onValueChange={handleTargetChange}>
-						<Select.Trigger class="mt-2 w-full">
-							{selectedTargetValue || m.select_target_size()}
-						</Select.Trigger>
-						<Select.Content>
-							{#each compressionTargets as target}
-								<Select.Item value={target.label}>{target.label}</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
+					<div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+						{#each compressionTargets as target}
+							<button
+								onclick={() => handlePresetSelect(target)}
+								class="rounded-lg border p-3 text-center transition-colors hover:bg-accent/50 {!useCustomTarget && selectedTarget.label === target.label ? 'border-primary bg-accent/30' : 'border-border'}"
+								disabled={!isLoaded || isProcessing}
+							>
+								<div class="text-sm font-medium">{target.label}</div>
+								<div class="text-xs text-muted-foreground">{m[`target_${target.label.replace(' ', '_').toLowerCase()}`]?.() ?? target.description}</div>
+							</button>
+						{/each}
+					</div>
+					<div class="mt-2">
+						<button
+							onclick={handleCustomTargetSelect}
+							class="w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent/50 {useCustomTarget ? 'border-primary bg-accent/30' : 'border-border'}"
+							disabled={!isLoaded || isProcessing}
+						>
+							<div class="flex items-center justify-between">
+								<div>
+									<div class="text-sm font-medium">{m.custom_size?.() ?? 'Custom Size'}</div>
+									<div class="text-xs text-muted-foreground">{m.custom_size_description?.() ?? 'Enter your own target size'}</div>
+								</div>
+								{#if useCustomTarget}
+									<div class="flex items-center gap-2">
+										<Input
+											type="number"
+											min="1"
+											max="5000"
+											bind:value={customTargetMB}
+											class="w-20 text-center"
+											onclick={(e) => e.stopPropagation()}
+											disabled={isProcessing}
+										/>
+										<span class="text-sm text-muted-foreground">MB</span>
+									</div>
+								{/if}
+							</div>
+						</button>
+					</div>
 				</div>
 
 				<!-- Advanced Settings Section -->
@@ -914,7 +962,7 @@
 
 						<div class="flex items-center justify-between">
 							<span class="text-sm font-medium">{m.compressed_size()}:</span>
-							<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
+							<Badge variant={compressedSize <= effectiveTargetValue ? 'default' : 'destructive'}>
 								{formatFileSize(compressedSize)}
 							</Badge>
 						</div>
@@ -928,13 +976,13 @@
 							<div class="flex items-center justify-between">
 								<span class="text-sm font-medium">{m.target_met()}:</span>
 								<Badge
-									variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}
+									variant={compressedSize <= effectiveTargetValue ? 'default' : 'destructive'}
 								>
-									{compressedSize <= selectedTarget.value ? m.yes() : m.no()}
+									{compressedSize <= effectiveTargetValue ? m.yes() : m.no()}
 								</Badge>
 							</div>
 
-							{#if compressedSize > selectedTarget.value}
+							{#if compressedSize > effectiveTargetValue}
 								<Alert.Root>
 									<Alert.Description>
 										{m.target_size_warning()}

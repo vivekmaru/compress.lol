@@ -29,7 +29,7 @@
 	"download_compressed": "Pobierz skompresowane wideo",
 	"upload_compress_message": "Wrzuć i skompresuj jakiś film, a wyniki pojawią się tutaj",
 	"target_size_warning": "Skompresowany film jest większy niż rozmiar docelowy. Wybierz inny cel albo krótsze wideo.",
-	"small_video_warning": "Oryginalny plik jest już mniejszy niż wybrany limit. Kompresja może zwiększyć jego rozmiar. Wybierz mniejszy limit albo pozostaw plik bez zmian.",
+	"small_video_warning": "Uwaga: Oryginalny plik jest już mniejszy niż wybrany limit. Ponowne kodowanie może nie zmniejszyć rozmiaru pliku, ale możesz kontynuować, jeśli chcesz.",
 	"how_it_works": "Jak to działa?",
 	"how_target_size": "Wybierz docelowy rozmiar - skompresujemy Twój plik, aby osiągnął dokładnie ten rozmiar!",
 	"how_motion_detection": "Inteligentne wykrywanie ruchu - sceny ruchome będą miały zachowaną jakość, a sceny statyczne będą mocniej skompresowane.",
@@ -107,5 +107,11 @@
 	"max_width_description": "Ustaw 0, aby nie było limitu. Obrazy szersze zostaną zmniejszone.",
 	"smaller_file": "Mniejszy plik",
 	"better_quality": "Lepsza jakość",
-	"compression_failed": "Kompresja nie powiodła się"
+	"compression_failed": "Kompresja nie powiodła się",
+	"custom_size": "Własny rozmiar",
+	"custom_size_description": "Wprowadź własny rozmiar docelowy",
+	"target_8_mb": "Discord",
+	"target_25_mb": "Email",
+	"target_50_mb": "Slack",
+	"target_100_mb": "Duże pliki"
 }

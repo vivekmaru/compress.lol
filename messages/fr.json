@@ -29,7 +29,7 @@
 	"download_compressed": "Télécharger la vidéo compressée",
 	"upload_compress_message": "Téléversez et compressez une vidéo pour voir les résultats ici",
 	"target_size_warning": "La vidéo compressée est plus grande que la taille cible. Essayez de sélectionner une cible plus petite ou une vidéo plus courte.",
-	"small_video_warning": "Le fichier original est déjà plus petit que la taille cible sélectionnée. La recompression peut augmenter sa taille. Choisissez une cible plus petite ou conservez le fichier tel quel.",
+	"small_video_warning": "Note : Le fichier original est déjà plus petit que la taille cible sélectionnée. Le réencodage ne réduira peut-être pas davantage la taille, mais vous pouvez continuer si vous le souhaitez.",
 	"how_it_works": "Comment ça marche",
 	"how_target_size": "Choisissez votre taille cible - Nous compresserons parfaitement votre vidéo !",
 	"how_motion_detection": "Détection intelligente du mouvement - Les scènes en mouvement gardent plus de qualité.",
@@ -107,5 +107,11 @@
 	"max_width_description": "Mettez 0 pour aucune limite. Les images plus larges seront redimensionnées.",
 	"smaller_file": "Fichier plus petit",
 	"better_quality": "Meilleure qualité",
-	"compression_failed": "Échec de la compression"
+	"compression_failed": "Échec de la compression",
+	"custom_size": "Taille personnalisée",
+	"custom_size_description": "Entrez votre propre taille cible",
+	"target_8_mb": "Discord",
+	"target_25_mb": "Email",
+	"target_50_mb": "Slack",
+	"target_100_mb": "Gros fichiers"
 }
