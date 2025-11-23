@@ -557,15 +557,15 @@
 		</Card.Root>
 	{:else if queuedFiles.length === 0}
 		<!-- Empty state with How it works -->
-		<Card.Root class="border-dashed">
-			<Card.Content class="py-8">
-				<div class="space-y-4 text-center">
-					<p class="text-sm text-muted-foreground">{m.select_a_file?.() ?? 'Select a file to get started'}</p>
-					<div class="mx-auto max-w-md space-y-2 text-left text-sm text-muted-foreground">
-						<p>🎵 <strong>Multiple formats</strong> - MP3, AAC, Opus, OGG, WAV, FLAC, M4A</p>
-						<p>🎚️ <strong>Quality control</strong> - Choose between high, medium, and low quality</p>
-						<p>🔒 <strong>100% private</strong> - All processing happens in your browser</p>
-					</div>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>{m.how_it_works()}</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<div class="space-y-3">
+					<p class="text-sm">🎵 <strong>Multiple formats</strong> - MP3, AAC, Opus, OGG, WAV, FLAC, M4A</p>
+					<p class="text-sm">🎚️ <strong>Quality control</strong> - Choose between high, medium, and low quality</p>
+					<p class="text-sm">🔒 <strong>100% private</strong> - All processing happens in your browser</p>
 				</div>
 			</Card.Content>
 		</Card.Root>

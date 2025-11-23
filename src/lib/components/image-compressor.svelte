@@ -505,15 +505,15 @@
 		</Card.Root>
 	{:else if queuedFiles.length === 0}
 		<!-- Empty state with How it works -->
-		<Card.Root class="border-dashed">
-			<Card.Content class="py-8">
-				<div class="space-y-4 text-center">
-					<p class="text-sm text-muted-foreground">{m.select_a_file?.() ?? 'Select a file to get started'}</p>
-					<div class="mx-auto max-w-md space-y-2 text-left text-sm text-muted-foreground">
-						<p>🖼️ <strong>Modern formats</strong> - WebP, JPEG, PNG with quality control</p>
-						<p>📐 <strong>Resize support</strong> - Set max width to automatically scale down</p>
-						<p>🔒 <strong>100% private</strong> - All processing happens in your browser</p>
-					</div>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>{m.how_it_works()}</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<div class="space-y-3">
+					<p class="text-sm">🖼️ <strong>Modern formats</strong> - WebP, JPEG, PNG with quality control</p>
+					<p class="text-sm">📐 <strong>Resize support</strong> - Set max width to automatically scale down</p>
+					<p class="text-sm">🔒 <strong>100% private</strong> - All processing happens in your browser</p>
 				</div>
 			</Card.Content>
 		</Card.Root>

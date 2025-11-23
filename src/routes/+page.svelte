@@ -990,24 +990,16 @@
 					</Card.Root>
 				{:else if queuedFiles.length === 0}
 					<!-- Empty state with How it works -->
-					<Card.Root class="border-dashed">
-						<Card.Content class="py-8">
-							<div class="space-y-4 text-center">
-								<p class="text-sm text-muted-foreground">{m.select_a_file?.() ?? 'Select a file to get started'}</p>
-								<div class="mx-auto max-w-md space-y-3 text-left">
-									<p class="text-sm">
-										🎯 <strong>{m.how_target_size()}</strong>
-									</p>
-									<p class="text-sm">
-										🚀 <strong>{m.how_motion_detection()}</strong>
-									</p>
-									<p class="text-sm">
-										⚡ <strong>{m.how_lightning_fast()}</strong>
-									</p>
-									<p class="text-sm text-muted-foreground">
-										{m.how_perfect_for()}
-									</p>
-								</div>
+					<Card.Root>
+						<Card.Header>
+							<Card.Title>{m.how_it_works()}</Card.Title>
+						</Card.Header>
+						<Card.Content>
+							<div class="space-y-3">
+								<p class="text-sm">🎯 <strong>{m.how_target_size()}</strong></p>
+								<p class="text-sm">🚀 <strong>{m.how_motion_detection()}</strong></p>
+								<p class="text-sm">⚡ <strong>{m.how_lightning_fast()}</strong></p>
+								<p class="text-sm text-muted-foreground">{m.how_perfect_for()}</p>
 							</div>
 						</Card.Content>
 					</Card.Root>
