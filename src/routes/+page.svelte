@@ -5,12 +5,9 @@
 	import { fetchFile, toBlobURL } from '@ffmpeg/util';
 	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Loader from '@lucide/svelte/icons/loader-circle';
 	import * as m from '$lib/paraglide/messages.js';
@@ -675,10 +672,12 @@
 </svelte:head>
 
 <div class="container mx-auto max-w-4xl p-6">
-	<div class="mb-2 flex items-center justify-center gap-2">
-		<h1 class="mr-4 mb-2 text-4xl font-bold">{m.app_title()}</h1>
-		<LanguageSelector />
-		<ThemeSelector />
+	<div class="mb-4 flex items-center justify-center gap-4">
+		<h1 class="text-4xl font-bold">{m.app_title()}</h1>
+		<div class="flex items-center gap-2">
+			<LanguageSelector />
+			<ThemeSelector />
+		</div>
 	</div>
 	<div class="mb-8 text-center">
 		<p class="text-muted-foreground">{m.app_subtitle()}</p>
@@ -707,285 +706,304 @@
 		</div>
 
 		<Tabs.Content value="video">
-			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>{m.upload_video()}</Card.Title>
-				<Card.Description>{m.upload_description()}</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				<div>
-					<Label>{m.choose_video_file()}</Label>
-					<DropZone
-						accept="video/*,.mp4,.avi,.mov,.wmv,.flv,.webm,.mkv,.m4v,.3gp,.ogv"
-						disabled={!isLoaded || isProcessing}
-						multiple={true}
-						onFilesSelected={handleFilesSelected}
-						class="mt-2"
-					/>
-					<FileQueue
-						files={queuedFiles}
-						onRemove={removeFileFromQueue}
-						onClearAll={clearFileQueue}
-						disabled={isProcessing}
-						class="mt-3"
-					/>
-				</div>
-
-				{#if videoMetadata}
-					<div class="space-y-2">
-						<h4 class="font-medium">{m.video_information()}</h4>
-						<div class="grid grid-cols-2 gap-2 text-sm">
-							<div>{m.duration()}: {formatDuration(videoMetadata.duration)}</div>
-							<div>{m.resolution()}: {videoMetadata.resolution}</div>
-							<div>{m.size()}: {formatFileSize(videoMetadata.size)}</div>
-							<div>FPS: {videoMetadata.fps}</div>
-							<div class="col-span-2">
-								{m.motion_level()}:
-								<Badge variant={videoMetadata.hasMotion ? 'destructive' : 'secondary'}>
-									{videoMetadata.hasMotion ? m.high_motion() : m.low_motion()}
-								</Badge>
-							</div>
-						</div>
-					</div>
-				{/if}
-
-				<div>
-					<Label>{m.target_size()}</Label>
-					<Select.Root type="single" value={selectedTargetValue} onValueChange={handleTargetChange}>
-						<Select.Trigger class="mt-2 w-full">
-							{selectedTargetValue || m.select_target_size()}
-						</Select.Trigger>
-						<Select.Content>
-							{#each compressionTargets as target}
-								<Select.Item value={target.label}>{target.label}</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
-				</div>
-
-				<!-- Advanced Settings Section -->
-				<div class="rounded-lg border">
-					<button
-						onclick={() => (showAdvancedSettings = !showAdvancedSettings)}
-						class="flex w-full items-center justify-between rounded-t-lg p-3 text-left transition-colors hover:bg-accent/50"
-					>
-						<div class="flex items-center gap-2">
-							<Settings class="h-4 w-4" />
-							<span class="text-sm font-medium">{m.advanced_settings()}</span>
-						</div>
-						<ChevronDown
-							class="h-4 w-4 transition-transform duration-200 {showAdvancedSettings
-								? 'rotate-180'
-								: ''}"
+			<div class="space-y-6">
+				<!-- Upload Section -->
+				<Card.Root>
+					<Card.Content class="pt-6">
+						<DropZone
+							accept="video/*,.mp4,.avi,.mov,.wmv,.flv,.webm,.mkv,.m4v,.3gp,.ogv"
+							disabled={!isLoaded || isProcessing}
+							multiple={true}
+							onFilesSelected={handleFilesSelected}
+							size="large"
+							showPrivacyBadge={true}
 						/>
-					</button>
+						<FileQueue
+							files={queuedFiles}
+							onRemove={removeFileFromQueue}
+							onClearAll={clearFileQueue}
+							disabled={isProcessing}
+							class="mt-4"
+						/>
+					</Card.Content>
+				</Card.Root>
 
-					<div
-						class="overflow-hidden transition-all duration-300 ease-in-out"
-						style="max-height: {showAdvancedSettings ? '350px' : '0px'};"
-					>
-						<div class="space-y-4 border-t p-3">
-							<div class="flex items-start space-x-3">
-								<input
-									type="checkbox"
-									id="audio-only-mode"
-									bind:checked={audioOnlyMode}
-									class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-								/>
-								<div class="grid gap-1">
-									<label
-										for="audio-only-mode"
-										class="cursor-pointer text-sm leading-none font-medium"
-									>
-										{m.audio_only_mode()}
-									</label>
-									<p class="text-xs text-muted-foreground">{m.audio_only_mode_description()}</p>
-								</div>
-							</div>
-
-							<div class="flex items-start space-x-3">
-								<input
-									type="checkbox"
-									id="mute-sound"
-									bind:checked={muteSound}
-									class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-								/>
-								<div class="grid gap-1">
-									<label for="mute-sound" class="cursor-pointer text-sm leading-none font-medium">
-										{m.mute_sound()}
-									</label>
-									<p class="text-xs text-muted-foreground">{m.mute_sound_description()}</p>
-								</div>
-							</div>
-
-							<div class="flex items-start space-x-3">
-								<input
-									type="checkbox"
-									id="preserve-original-fps"
-									bind:checked={preserveOriginalFps}
-									class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-								/>
-								<div class="grid gap-1">
-									<label
-										for="preserve-original-fps"
-										class="cursor-pointer text-sm leading-none font-medium"
-									>
-										{m.preserve_original_fps()}
-									</label>
-									<p class="text-xs text-muted-foreground">
-										{m.preserve_original_fps_description()}
-									</p>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				{#if isFileSmallerThanTarget}
-					<Alert.Root
-						class="border-yellow-500/70 bg-yellow-500/10 text-yellow-900 dark:text-yellow-100"
-					>
-						<Alert.Description>{m.small_video_warning()}</Alert.Description>
-					</Alert.Root>
-				{/if}
-
-				{#if isChromium}
-					<Alert.Root class="mt-2">
-						<Alert.Description>
-							{m.chromium_warning()}
-						</Alert.Description>
-					</Alert.Root>
-				{/if}
-
-				<Button
-					onclick={compressVideo}
-					disabled={queuedFiles.filter((f) => f.status === 'pending').length === 0 ||
-						!isLoaded ||
-						isProcessing}
-					class="w-full"
-				>
-					{#if isProcessing}
-						{audioOnlyMode ? m.processing_audio() : m.compressing()}
-						{#if queuedFiles.length > 1}
-							({currentProcessingIndex + 1}/{queuedFiles.filter((f) => f.status !== 'completed').length})
-						{/if}
-					{:else}
-						{audioOnlyMode ? m.process_audio_only() : m.compress_video()}
-						{#if queuedFiles.filter((f) => f.status === 'pending').length > 1}
-							({queuedFiles.filter((f) => f.status === 'pending').length} {m.files_label?.() ?? 'files'})
-						{/if}
-					{/if}
-				</Button>
-
-				{#if isProcessing && progress > 0}
-					<div class="space-y-2">
-						<div class="flex justify-between text-sm">
-							<span>{m.progress()}</span>
-							<div class="flex items-center gap-2">
-								<span>{progress}%</span>
-								{#if estimatedTimeRemaining > 0}
-									<span class="text-muted-foreground"
-										>• ~{formatTimeRemaining(estimatedTimeRemaining)}</span
-									>
-								{/if}
-							</div>
-						</div>
-						<Progress value={progress} class="w-full" />
-						<p class="text-center text-xs text-muted-foreground">{message}</p>
-					</div>
-				{/if}
-			</Card.Content>
-		</Card.Root>
-
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>{audioOnlyMode ? m.audio_processing_results() : m.results()}</Card.Title>
-				<Card.Description>{m.results_description()}</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
-				{#if processedVideos.length > 0}
-					<div class="space-y-3">
-						<!-- Summary stats -->
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.original_size()}:</span>
-							<Badge variant="secondary">{formatFileSize(originalSize)}</Badge>
-						</div>
-
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.compressed_size()}:</span>
-							<Badge variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}>
-								{formatFileSize(compressedSize)}
-							</Badge>
-						</div>
-
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">{m.size_reduction()}:</span>
-							<Badge variant="outline">{compressionRatio.toFixed(1)}%</Badge>
-						</div>
-
-						{#if processedVideos.length === 1}
-							<div class="flex items-center justify-between">
-								<span class="text-sm font-medium">{m.target_met()}:</span>
-								<Badge
-									variant={compressedSize <= selectedTarget.value ? 'default' : 'destructive'}
-								>
-									{compressedSize <= selectedTarget.value ? m.yes() : m.no()}
-								</Badge>
-							</div>
-
-							{#if compressedSize > selectedTarget.value}
-								<Alert.Root>
-									<Alert.Description>
-										{m.target_size_warning()}
-									</Alert.Description>
-								</Alert.Root>
-							{/if}
-						{/if}
-
-						<!-- Individual file results for batch -->
-						{#if processedVideos.length > 1}
-							<div class="mt-4 space-y-2">
-								<h4 class="text-sm font-medium">
-									{m.processed_files?.() ?? 'Processed Files'} ({processedVideos.length})
-								</h4>
-								<div class="max-h-[150px] space-y-1 overflow-y-auto rounded-md border p-2">
-									{#each processedVideos as pv (pv.id)}
-										<div
-											class="flex items-center justify-between rounded p-2 text-sm hover:bg-accent/50"
-										>
-											<span class="truncate" title={pv.file.name}>{pv.file.name}</span>
-											<div class="flex items-center gap-2">
-												<span class="text-xs text-muted-foreground">
-													{formatFileSize(pv.file.size)} → {formatFileSize(pv.compressedSize ?? 0)}
-												</span>
-												<Button
-													variant="ghost"
-													size="sm"
-													onclick={() => downloadSingleVideo(pv)}
-												>
-													{m.download?.() ?? 'Download'}
-												</Button>
-											</div>
+				<!-- Configuration Section (only show when files are selected) -->
+				{#if queuedFiles.length > 0}
+					<Card.Root>
+						<Card.Content class="space-y-6 pt-6">
+							{#if videoMetadata}
+								<div class="space-y-2">
+									<h4 class="text-sm font-medium">{m.video_information()}</h4>
+									<div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+										<div class="rounded-md bg-muted/50 p-2 text-center">
+											<div class="text-xs text-muted-foreground">{m.duration()}</div>
+											<div class="font-medium">{formatDuration(videoMetadata.duration)}</div>
 										</div>
+										<div class="rounded-md bg-muted/50 p-2 text-center">
+											<div class="text-xs text-muted-foreground">{m.resolution()}</div>
+											<div class="font-medium">{videoMetadata.resolution}</div>
+										</div>
+										<div class="rounded-md bg-muted/50 p-2 text-center">
+											<div class="text-xs text-muted-foreground">{m.size()}</div>
+											<div class="font-medium">{formatFileSize(videoMetadata.size)}</div>
+										</div>
+										<div class="rounded-md bg-muted/50 p-2 text-center">
+											<div class="text-xs text-muted-foreground">FPS</div>
+											<div class="font-medium">{videoMetadata.fps}</div>
+										</div>
+									</div>
+								</div>
+							{/if}
+
+							<!-- Target Size Button Group -->
+							<div class="space-y-3">
+								<Label>{m.target_size()}</Label>
+								<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+									{#each compressionTargets as target}
+										<button
+											type="button"
+											onclick={() => handleTargetChange(target.label)}
+											class="flex flex-col items-center rounded-lg border-2 p-3 transition-all {selectedTargetValue ===
+											target.label
+												? 'border-primary bg-primary/10'
+												: 'border-muted hover:border-primary/50 hover:bg-accent/50'}"
+										>
+											<span class="text-sm font-semibold">{target.label}</span>
+											<span class="text-xs text-muted-foreground">
+												{#if target.label === '8 MB'}
+													{m.target_8mb_hint?.() ?? 'Discord'}
+												{:else if target.label === '25 MB'}
+													{m.target_25mb_hint?.() ?? 'Email'}
+												{:else if target.label === '50 MB'}
+													{m.target_50mb_hint?.() ?? 'Slack'}
+												{:else}
+													{m.target_100mb_hint?.() ?? 'Large files'}
+												{/if}
+											</span>
+										</button>
 									{/each}
 								</div>
 							</div>
-						{/if}
 
-						<Button onclick={downloadAllVideos} class="w-full">
-							{processedVideos.length > 1
-								? (m.download_all?.() ?? 'Download All')
-								: m.download_compressed()}
-						</Button>
-					</div>
-				{:else}
-					<div class="py-8 text-center text-muted-foreground">
-						{m.upload_compress_message()}
-					</div>
+							<!-- Advanced Settings Section -->
+							<div class="rounded-lg border">
+								<button
+									onclick={() => (showAdvancedSettings = !showAdvancedSettings)}
+									class="flex w-full items-center justify-between rounded-t-lg p-3 text-left transition-colors hover:bg-accent/50"
+								>
+									<div class="flex items-center gap-2">
+										<Settings class="h-4 w-4" />
+										<span class="text-sm font-medium">{m.advanced_settings()}</span>
+									</div>
+									<ChevronDown
+										class="h-4 w-4 transition-transform duration-200 {showAdvancedSettings
+											? 'rotate-180'
+											: ''}"
+									/>
+								</button>
+
+								<div
+									class="overflow-hidden transition-all duration-300 ease-in-out"
+									style="max-height: {showAdvancedSettings ? '350px' : '0px'};"
+								>
+									<div class="space-y-4 border-t p-3">
+										<div class="flex items-start space-x-3">
+											<input
+												type="checkbox"
+												id="audio-only-mode"
+												bind:checked={audioOnlyMode}
+												class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+											/>
+											<div class="grid gap-1">
+												<label
+													for="audio-only-mode"
+													class="cursor-pointer text-sm leading-none font-medium"
+												>
+													{m.audio_only_mode()}
+												</label>
+												<p class="text-xs text-muted-foreground">{m.audio_only_mode_description()}</p>
+											</div>
+										</div>
+
+										<div class="flex items-start space-x-3">
+											<input
+												type="checkbox"
+												id="mute-sound"
+												bind:checked={muteSound}
+												class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+											/>
+											<div class="grid gap-1">
+												<label for="mute-sound" class="cursor-pointer text-sm leading-none font-medium">
+													{m.mute_sound()}
+												</label>
+												<p class="text-xs text-muted-foreground">{m.mute_sound_description()}</p>
+											</div>
+										</div>
+
+										<div class="flex items-start space-x-3">
+											<input
+												type="checkbox"
+												id="preserve-original-fps"
+												bind:checked={preserveOriginalFps}
+												class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+											/>
+											<div class="grid gap-1">
+												<label
+													for="preserve-original-fps"
+													class="cursor-pointer text-sm leading-none font-medium"
+												>
+													{m.preserve_original_fps()}
+												</label>
+												<p class="text-xs text-muted-foreground">
+													{m.preserve_original_fps_description()}
+												</p>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							{#if isFileSmallerThanTarget}
+								<Alert.Root
+									class="border-yellow-500/70 bg-yellow-500/10 text-yellow-900 dark:text-yellow-100"
+								>
+									<Alert.Description>{m.small_video_warning()}</Alert.Description>
+								</Alert.Root>
+							{/if}
+
+							<Button
+								onclick={compressVideo}
+								disabled={queuedFiles.filter((f) => f.status === 'pending').length === 0 ||
+									!isLoaded ||
+									isProcessing}
+								class="h-12 w-full text-base font-semibold"
+								size="lg"
+							>
+								{#if isProcessing}
+									<Loader class="mr-2 h-5 w-5 animate-spin" />
+									{audioOnlyMode ? m.processing_audio() : m.compressing()}
+									{#if queuedFiles.length > 1}
+										({currentProcessingIndex + 1}/{queuedFiles.filter((f) => f.status !== 'completed').length})
+									{/if}
+								{:else}
+									{audioOnlyMode ? m.process_audio_only() : m.compress_video()}
+									{#if queuedFiles.filter((f) => f.status === 'pending').length > 1}
+										({queuedFiles.filter((f) => f.status === 'pending').length} {m.files_label?.() ?? 'files'})
+									{/if}
+								{/if}
+							</Button>
+
+							{#if isProcessing && progress > 0}
+								<div class="space-y-2">
+									<div class="flex justify-between text-sm">
+										<span>{m.progress()}</span>
+										<div class="flex items-center gap-2">
+											<span>{progress}%</span>
+											{#if estimatedTimeRemaining > 0}
+												<span class="text-muted-foreground"
+													>• ~{formatTimeRemaining(estimatedTimeRemaining)}</span
+												>
+											{/if}
+										</div>
+									</div>
+									<Progress value={progress} class="w-full" />
+									<p class="text-center text-xs text-muted-foreground">{message}</p>
+								</div>
+							{/if}
+						</Card.Content>
+					</Card.Root>
 				{/if}
-			</Card.Content>
-		</Card.Root>
+
+				<!-- Results Section -->
+				{#if processedVideos.length > 0}
+					<Card.Root class="border-green-500/30 bg-green-500/5">
+						<Card.Header>
+							<Card.Title class="flex items-center gap-2">
+								<span class="text-green-500">✓</span>
+								{audioOnlyMode ? m.audio_processing_results() : m.results()}
+							</Card.Title>
+						</Card.Header>
+						<Card.Content class="space-y-4">
+							<div class="space-y-3">
+								<!-- Summary stats -->
+								<div class="grid grid-cols-3 gap-3 text-center">
+									<div class="rounded-lg bg-background p-3">
+										<div class="text-xs text-muted-foreground">{m.original_size()}</div>
+										<div class="font-semibold">{formatFileSize(originalSize)}</div>
+									</div>
+									<div class="rounded-lg bg-background p-3">
+										<div class="text-xs text-muted-foreground">{m.compressed_size()}</div>
+										<div class="font-semibold text-green-500">{formatFileSize(compressedSize)}</div>
+									</div>
+									<div class="rounded-lg bg-background p-3">
+										<div class="text-xs text-muted-foreground">{m.size_reduction()}</div>
+										<div class="font-semibold">{compressionRatio.toFixed(1)}%</div>
+									</div>
+								</div>
+
+								{#if processedVideos.length === 1 && compressedSize > selectedTarget.value}
+									<Alert.Root>
+										<Alert.Description>
+											{m.target_size_warning()}
+										</Alert.Description>
+									</Alert.Root>
+								{/if}
+
+								<!-- Individual file results for batch -->
+								{#if processedVideos.length > 1}
+									<div class="space-y-2">
+										<h4 class="text-sm font-medium">
+											{m.processed_files?.() ?? 'Processed Files'} ({processedVideos.length})
+										</h4>
+										<div class="max-h-[150px] space-y-1 overflow-y-auto rounded-md border bg-background p-2">
+											{#each processedVideos as pv (pv.id)}
+												<div
+													class="flex items-center justify-between rounded p-2 text-sm hover:bg-accent/50"
+												>
+													<span class="truncate" title={pv.file.name}>{pv.file.name}</span>
+													<div class="flex items-center gap-2">
+														<span class="text-xs text-muted-foreground">
+															{formatFileSize(pv.file.size)} → {formatFileSize(pv.compressedSize ?? 0)}
+														</span>
+														<Button
+															variant="ghost"
+															size="sm"
+															onclick={() => downloadSingleVideo(pv)}
+														>
+															{m.download?.() ?? 'Download'}
+														</Button>
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
+
+								<Button onclick={downloadAllVideos} class="h-12 w-full text-base font-semibold" size="lg">
+									{processedVideos.length > 1
+										? (m.download_all?.() ?? 'Download All')
+										: m.download_compressed()}
+								</Button>
+							</div>
+						</Card.Content>
+					</Card.Root>
+				{:else if queuedFiles.length === 0}
+					<!-- Empty state with How it works -->
+					<Card.Root>
+						<Card.Header>
+							<Card.Title>{m.how_it_works()}</Card.Title>
+						</Card.Header>
+						<Card.Content>
+							<div class="space-y-3">
+								<p class="text-sm">🎯 <strong>{m.how_target_size()}</strong></p>
+								<p class="text-sm">🚀 <strong>{m.how_motion_detection()}</strong></p>
+								<p class="text-sm">⚡ <strong>{m.how_lightning_fast()}</strong></p>
+								<p class="text-sm text-muted-foreground">{m.how_perfect_for()}</p>
+							</div>
+						</Card.Content>
+					</Card.Root>
+				{/if}
 			</div>
 		</Tabs.Content>
 
@@ -1005,29 +1023,7 @@
 		</Tabs.Content>
 	</Tabs.Root>
 
-	<Card.Root class="mt-6">
-		<Card.Header>
-			<Card.Title>{m.how_it_works()}</Card.Title>
-		</Card.Header>
-		<Card.Content>
-			<div class="space-y-3">
-				<p class="text-sm">
-					🎯 <strong>{m.how_target_size()}</strong>
-				</p>
-				<p class="text-sm">
-					🚀 <strong>{m.how_motion_detection()}</strong>
-				</p>
-				<p class="text-sm">
-					⚡ <strong>{m.how_lightning_fast()}</strong>
-				</p>
-				<p class="text-sm text-muted-foreground">
-					{m.how_perfect_for()}
-				</p>
-			</div>
-		</Card.Content>
-	</Card.Root>
-
-	<footer class="mt-6 pb-6 text-center text-sm text-muted-foreground">
+	<footer class="mt-8 pb-6 text-center text-sm text-muted-foreground">
 		<p>{@html m.footer_text()}</p>
 		<p class="italic">{m.footer_subtext()}</p>
 	</footer>
