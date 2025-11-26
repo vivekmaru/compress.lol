@@ -135,6 +135,7 @@ Apache 2.0 License – see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgements
 
+- [Original compress.lol](https://github.com/anhostfr/compress.lol) by [Anhost](https://github.com/anhostfr) – This project is inspired from the original compress.lol
 - [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) – FFmpeg compiled to WebAssembly
 - [SvelteKit](https://kit.svelte.dev/) – The fastest way to build svelte apps
 - [Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs) – Type-safe i18n
