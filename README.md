@@ -1,7 +1,6 @@
 # 🎬 Compress.lol – WebAssembly-Powered Media Compression
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![GitHub issues](https://img.shields.io/github/issues/anhostfr/compress.lol)](https://github.com/anhostfr/compress.lol/issues)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-FF3E00?style=flat&logo=svelte&logoColor=white)](https://kit.svelte.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-007808?style=flat&logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
@@ -35,7 +34,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/anhostfr/compress.lol
+git clone https://github.com/vivekmaru/compress.lol
 cd compress.lol
 
 # Install dependencies
@@ -136,6 +135,7 @@ Apache 2.0 License – see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgements
 
+- [Original compress.lol](https://github.com/anhostfr/compress.lol) by [Anhost](https://github.com/anhostfr) – This project is inspired from the original compress.lol
 - [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) – FFmpeg compiled to WebAssembly
 - [SvelteKit](https://kit.svelte.dev/) – The fastest way to build svelte apps
 - [Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs) – Type-safe i18n
