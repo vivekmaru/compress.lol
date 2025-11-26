@@ -37,7 +37,7 @@
 	"how_perfect_for": "Discord, सोशल मीडिया, या कहीं भी जहाँ आपको छोटी वीडियो फ़ाइलें चाहिए के लिए परफेक्ट!",
 	"file_size_limit_error": "फ़ाइल साइज़ 5GB ब्राउज़र सीमा से अधिक है। कृपया छोटी फ़ाइल चुनें।",
 	"select_valid_video": "कृपया एक वैध वीडियो फ़ाइल चुनें।",
-	"footer_text": "Apache 2.0 लाइसेंस | <a class='text-primary underline' href='https://github.com/anhostfr'>Anhost</a> द्वारा निर्मित | FFmpeg.wasm द्वारा संचालित | <a class='text-primary underline' href='https://github.com/anhostfr/compress.lol'>GitHub</a> पर सोर्स",
+	"footer_text": "Apache 2.0 लाइसेंस | FFmpeg.wasm द्वारा संचालित",
 	"footer_subtext": "नोट: कंप्रेशन पूरी तरह से आपके ब्राउज़र में होता है। कोई फ़ाइल किसी सर्वर पर अपलोड नहीं होती।",
 	"chromium_warning": "Chromium-आधारित ब्राउज़र पता चला। मल्टी-थ्रेडिंग सक्षम है लेकिन कंप्रेशन अपेक्षा से धीमा हो सकता है।",
 	"advanced_settings": "एडवांस्ड सेटिंग्स",

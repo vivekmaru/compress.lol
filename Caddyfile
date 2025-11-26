@@ -1,8 +1,8 @@
-# Caddyfile for compress.lol
+# Caddyfile for media compression app
 # Caddy automatically handles SSL certificate provisioning via Let's Encrypt
 
 # Replace with your domain
-compress.lol {
+yourdomain.com {
     # Reverse proxy to the SvelteKit app
     reverse_proxy app:3000
 

@@ -1,6 +1,6 @@
-# Deployment Guide for compress.lol
+# Deployment Guide
 
-This guide covers deploying compress.lol to **Vercel** (recommended for simplicity) and **VPS + Docker** (for full control).
+This guide covers deploying to **Vercel** (recommended for simplicity) and **VPS + Docker** (for full control).
 
 ## Prerequisites
 
@@ -147,7 +147,7 @@ docker compose version
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/compress.lol.git
+git clone https://github.com/vivekmaru/compress.lol.git
 cd compress.lol
 
 # Build and start the container
@@ -207,7 +207,7 @@ volumes:
 Create `Caddyfile`:
 
 ```
-compress.lol {
+yourdomain.com {
     reverse_proxy app:3000
 }
 ```
@@ -389,7 +389,7 @@ cross-origin-opener-policy: same-origin
 |----------|-----------|------------------------|
 | Vercel | 100GB bandwidth, unlimited deploys | $0 - $20/mo |
 | DigitalOcean Droplet | None | $4 - $12/mo |
-| Hetzner Cloud | None | ¬3.79 - ¬8/mo |
+| Hetzner Cloud | None | ï¿½3.79 - ï¿½8/mo |
 | AWS Lightsail | First 3 months free | $3.50 - $10/mo |
 
 ---

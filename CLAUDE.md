@@ -1,8 +1,8 @@
-# CLAUDE.md - AI Assistant Guide for compress.lol
+# CLAUDE.md - AI Assistant Guide
 
 ## Project Overview
 
-**compress.lol** is a WebAssembly-powered media compression application that runs entirely in the browser. It uses FFmpeg compiled to WebAssembly (via `@ffmpeg/ffmpeg`) to compress video and audio files client-side, ensuring user privacy as no files are uploaded to any server.
+This is a WebAssembly-powered media compression application that runs entirely in the browser. It uses FFmpeg compiled to WebAssembly (via `@ffmpeg/ffmpeg`) to compress video and audio files client-side, ensuring user privacy as no files are uploaded to any server.
 
 ### Key Features
 - Target-size video compression (8MB, 25MB, 50MB, 100MB)
@@ -31,7 +31,7 @@
 ## Codebase Structure
 
 ```
-compress.lol/
+project-root/
 ├── src/
 │   ├── routes/
 │   │   ├── +page.svelte          # Main page with video/audio/image compression tabs
@@ -316,10 +316,10 @@ Multi-stage build with Node.js 20 Alpine:
 
 ```bash
 # Build image
-docker build -t compress.lol .
+docker build -t media-compressor .
 
 # Run container
-docker run -p 3000:3000 compress.lol
+docker run -p 3000:3000 media-compressor
 ```
 
 The container runs on port 3000 with a non-root user (`sveltekit`).
